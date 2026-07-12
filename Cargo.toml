@@ -1,0 +1,36 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/git",
+    "crates/runtime",
+    "crates/server",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+grow-core = { path = "crates/core" }
+grow-git = { path = "crates/git" }
+grow-runtime = { path = "crates/runtime" }
+grow-server = { path = "crates/server" }
+
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+thiserror = "2"
+gix = "0.85"
+wasmtime = "46"
+wasmtime-wasi = "46"
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
+clap = { version = "4", features = ["derive"] }
+mime_guess = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+wat = "1"
+tempfile = "3"

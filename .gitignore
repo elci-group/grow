@@ -1,0 +1,6 @@
+/target
+/examples/hello-app/main.wasm
+/.kaptaind
+/.amber
+/amber_proposals
+/amber_report.json
