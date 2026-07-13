@@ -81,8 +81,14 @@ fn inspect(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     println!("\x1b[1;36mname\x1b[0m        {}", manifest.grow.name);
     println!("\x1b[1;36mversion\x1b[0m     {}", manifest.grow.version);
     println!("\x1b[1;36mcommit\x1b[0m      {}", repo.head_commit());
-    println!("\x1b[1;36mruntime\x1b[0m     {}", manifest.wasm_entry().unwrap_or("\x1b[33mstatic\x1b[0m"));
-    println!("\x1b[1;36mnetwork\x1b[0m     {}", manifest.network.enabled.unwrap_or(false));
+    println!(
+        "\x1b[1;36mruntime\x1b[0m     {}",
+        manifest.wasm_entry().unwrap_or("\x1b[33mstatic\x1b[0m")
+    );
+    println!(
+        "\x1b[1;36mnetwork\x1b[0m     {}",
+        manifest.network.enabled.unwrap_or(false)
+    );
     println!(
         "\x1b[1;36mpermissions\x1b[0m filesystem={:?}, camera={:?}, microphone={:?}",
         manifest.permissions.filesystem,

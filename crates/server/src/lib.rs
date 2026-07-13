@@ -4,12 +4,21 @@
 //! and serves the application on localhost:
 //!
 //! * `GET /healthz` — liveness probe,
-//! * `GET` for a path that matches a file in the repository — static asset,
+//! * `GET /metrics` — request metrics (total, errors, avg duration),
+//! * `GET` for a path that matches a file in the repository — static asset with
+//!   `Cache-Control: public, max-age=3600, immutable` and `ETag` headers,
 //! * anything else — handed to the WASM entry module (CGI-style over WASI),
 //! * `404` when the repository declares no runtime entry.
 //!
+//! Middleware stack (applied in order, first to last):
+//! 1. CORS — permissive, allows cross-origin requests for local development
+//! 2. Rate limiter — 120 requests per minute per IP address
+//! 3. Tracing — structured logs with request IDs, duration, and status
+//! 4. Body limit — 1 MB max request body
+//!
 //! WASM invocations run on a blocking thread with a wall-clock timeout on
-//! top of the runtime's fuel metering.
+//! top of the runtime's fuel metering. Graceful shutdown handles Ctrl+C and
+//! SIGTERM.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -514,7 +523,10 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let headers = resp.headers();
         assert_eq!(headers[header::CONTENT_TYPE], "text/html");
-        assert_eq!(headers[header::CACHE_CONTROL], "public, max-age=3600, immutable");
+        assert_eq!(
+            headers[header::CACHE_CONTROL],
+            "public, max-age=3600, immutable"
+        );
         assert!(headers.contains_key(header::ETAG));
     }
 
