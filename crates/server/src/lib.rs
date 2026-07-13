@@ -216,7 +216,24 @@ async fn handle_request(
 
 fn serve_file(path: &str, bytes: Vec<u8>) -> HttpResponse {
     let mime = mime_guess::from_path(path).first_or_octet_stream();
-    ([(header::CONTENT_TYPE, mime.as_ref())], bytes).into_response()
+    let etag = format!("\"{:x}\"", md5_hash(&bytes));
+    (
+        [
+            (header::CONTENT_TYPE, mime.as_ref()),
+            (header::CACHE_CONTROL, "public, max-age=3600, immutable"),
+            (header::ETAG, etag.as_str()),
+        ],
+        bytes,
+    )
+        .into_response()
+}
+
+fn md5_hash(data: &[u8]) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    data.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn to_http(response: grow_runtime::Response) -> HttpResponse {

@@ -163,11 +163,16 @@ pub fn is_safe_relative_path(path: &str) -> bool {
         .any(|c| matches!(c, Component::ParentDir | Component::Prefix(_)))
 }
 
-/// Validate a storage quota string (e.g. "500mb", "1gb", "2.5tb").
+/// Validate a storage quota string (e.g. "500mb", "1gb", "2.5tb", "100").
+/// Bare numbers are interpreted as bytes.
 pub fn is_valid_quota(quota: &str) -> bool {
     let trimmed = quota.trim();
     if trimmed.is_empty() {
         return true; // empty quota is valid (no limit)
+    }
+    // Bare numbers are valid (interpreted as bytes).
+    if trimmed.parse::<f64>().is_ok() {
+        return true;
     }
     let suffixes = ["b", "kb", "mb", "gb", "tb"];
     let lower = trimmed.to_lowercase();
@@ -422,5 +427,57 @@ version = "1.0.0"
         assert_eq!(m.grow.name, m2.grow.name);
         assert_eq!(m.grow.version, m2.grow.version);
         assert_eq!(m.wasm_entry(), m2.wasm_entry());
+    }
+
+    #[test]
+    fn rejects_empty_version() {
+        let err = Manifest::from_toml(
+            r#"
+[grow]
+name = "app"
+version = "  "
+"#,
+        )
+        .unwrap_err();
+        assert!(matches!(err, ManifestError::MissingVersion));
+    }
+
+    #[test]
+    fn rejects_long_name() {
+        let name = "a".repeat(129);
+        let err = Manifest::from_toml(&format!(
+            r#"
+[grow]
+name = "{name}"
+version = "1.0.0"
+"#
+        ))
+        .unwrap_err();
+        assert!(matches!(err, ManifestError::NameTooLong(129)));
+    }
+
+    #[test]
+    fn valid_quota_formats() {
+        assert!(is_valid_quota("500mb"));
+        assert!(is_valid_quota("1gb"));
+        assert!(is_valid_quota("2.5TB"));
+        assert!(is_valid_quota("100"));
+        assert!(is_valid_quota(""));
+    }
+
+    #[test]
+    fn invalid_quota_is_rejected() {
+        let err = Manifest::from_toml(
+            r#"
+[grow]
+name = "app"
+version = "1.0.0"
+
+[storage]
+quota = "not_a_quota"
+"#,
+        )
+        .unwrap_err();
+        assert!(matches!(err, ManifestError::BadQuota(ref q) if q == "not_a_quota"));
     }
 }

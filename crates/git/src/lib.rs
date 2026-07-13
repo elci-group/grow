@@ -226,7 +226,7 @@ entry = "main.wasm"
     fn bare_repo_is_rejected() {
         let dir = tempfile::tempdir().unwrap();
         let out = Command::new("git")
-            .args(&["init", "--bare", "-b", "main"])
+            .args(["init", "--bare", "-b", "main"])
             .current_dir(dir.path())
             .output()
             .expect("git runs");
