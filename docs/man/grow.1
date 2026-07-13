@@ -1,0 +1,38 @@
+.TH GROW 1 "2026-07-13" "GROW 0.1.1" "User Commands"
+.SH NAME
+grow \- Git Repository Oriented Web runtime command-line interface
+.SH SYNOPSIS
+.B grow
+.I command
+.RI [ options ]
+.SH DESCRIPTION
+.B grow
+loads a committed GROW application from a local Git repository. Manifest,
+static assets, and WebAssembly entry modules are read from the verified HEAD
+tree, not from uncommitted working-tree files.
+.SH COMMANDS
+.TP
+.B inspect \fIREPO\fR
+Print the application name, manifest version, verified commit ID, and runtime
+entry configuration.
+.TP
+.B run \fIREPO\fR
+Execute the WebAssembly runtime once with a GET request for / and print its
+CGI-style response.
+.TP
+.B serve [--port \fIPORT\fR] \fIREPO\fR
+Run the local HTTP daemon on 127.0.0.1. The default port is 7870.
+.SH OPTIONS
+.TP
+.B -h, --help
+Print command help.
+.TP
+.B -V, --version
+Print the GROW CLI version.
+.SH FILES
+.TP
+.I .grow/manifest.toml
+Application manifest read from the committed repository tree.
+.SH EXIT STATUS
+Non-zero on invalid repositories, manifests, runtime failures, or server
+startup errors.

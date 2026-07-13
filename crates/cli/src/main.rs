@@ -20,6 +20,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Print the verified application identity and runtime configuration
+    Inspect {
+        /// Path to the GROW repository
+        repo: PathBuf,
+    },
     /// Execute the repository's WASM entry once and print the response
     Run {
         /// Path to the GROW repository
@@ -43,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     match Cli::parse().command {
+        Command::Inspect { repo } => inspect(&repo)?,
         // WASM invocation must not run on a tokio worker thread: WASI stdio
         // pipes block the current thread internally.
         Command::Run { repo } => run_once(&repo)?,
@@ -51,6 +57,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             runtime.block_on(grow_server::serve(grow_server::ServeConfig { repo, port }))?;
         }
     }
+    Ok(())
+}
+
+fn inspect(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let repo = Repository::open(repo_path)?;
+    let manifest = repo.manifest();
+    println!("name: {}", manifest.grow.name);
+    println!("version: {}", manifest.grow.version);
+    println!("commit: {}", repo.head_commit());
+    println!("runtime: {}", manifest.wasm_entry().unwrap_or("static"));
     Ok(())
 }
 

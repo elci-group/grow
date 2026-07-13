@@ -1,0 +1,26 @@
+.TH GROW-SERVER 1 "2026-07-13" "GROW 0.1.1" "User Commands"
+.SH NAME
+grow-server \- local GROW application daemon
+.SH SYNOPSIS
+.B grow-server
+.RI [ --port " PORT" ]
+.I REPO
+.SH DESCRIPTION
+.B grow-server
+serves a committed GROW application on loopback only. GET requests matching
+committed regular files are returned as static assets; unmatched GET and POST
+requests are dispatched to the committed WASI Preview 1 entry module.
+.SH OPTIONS
+.TP
+.B -p, --port \fIPORT\fR
+Loopback port to listen on. Defaults to 7870.
+.TP
+.B -h, --help
+Print command help.
+.TP
+.B -V, --version
+Print the daemon version.
+.SH LIMITS
+Request bodies are limited to 1 MiB. WASM invocations receive no filesystem,
+network, environment, or arguments, and are bounded by runtime fuel, 256 MiB
+linear memory, 16 MiB captured output, and a five-second daemon timeout.
