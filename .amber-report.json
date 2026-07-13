@@ -1,0 +1,804 @@
+{
+  "amber_version": "0.3.0",
+  "results": [
+    {
+      "crate": "axum",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: networking)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^0.8"
+    },
+    {
+      "crate": "clap",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 65% (removes 0 transitive deps)",
+        "Security safety: 50% (category: cli)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 65,
+          "usage_simplicity": 70
+        },
+        "overall": 65,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^4"
+    },
+    {
+      "crate": "gix",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^0.85"
+    },
+    {
+      "crate": "grow-core",
+      "metadata": {
+        "cve_count": 0,
+        "license": "MIT OR Apache-2.0",
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "0.1.2"
+    },
+    {
+      "crate": "grow-git",
+      "metadata": {
+        "cve_count": 0,
+        "license": "MIT OR Apache-2.0",
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "0.1.2"
+    },
+    {
+      "crate": "grow-runtime",
+      "metadata": {
+        "cve_count": 0,
+        "license": "MIT OR Apache-2.0",
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: datetime)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "0.1.2"
+    },
+    {
+      "crate": "grow-server",
+      "metadata": {
+        "cve_count": 0,
+        "license": "MIT OR Apache-2.0",
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "0.1.2"
+    },
+    {
+      "crate": "mime_guess",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^2"
+    },
+    {
+      "crate": "serde",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 0% (category: serialization)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: NEVER_REPLACE list match",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Security Critical",
+        "classification_stars": "◆◆◆◆◆",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 0,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 20,
+        "recommendation": "security_block"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^1"
+    },
+    {
+      "crate": "tempfile",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^3"
+    },
+    {
+      "crate": "thiserror",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 65% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: FREQUENTLY_REPLACEABLE list match",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 65,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 77,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^2"
+    },
+    {
+      "crate": "tokio",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 65% (removes 0 transitive deps)",
+        "Security safety: 0% (category: async-runtime)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: NEVER_REPLACE list match",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Security Critical",
+        "classification_stars": "◆◆◆◆◆",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 0,
+          "testability": 85,
+          "transitive_value": 65,
+          "usage_simplicity": 70
+        },
+        "overall": 20,
+        "recommendation": "security_block"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^1"
+    },
+    {
+      "crate": "toml",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: serialization)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^1"
+    },
+    {
+      "crate": "tower",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^0.5"
+    },
+    {
+      "crate": "tracing",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: logging)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^0.1"
+    },
+    {
+      "crate": "tracing-subscriber",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: logging)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^0.3"
+    },
+    {
+      "crate": "wasmtime",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: datetime)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^46"
+    },
+    {
+      "crate": "wasmtime-wasi",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: datetime)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^46"
+    },
+    {
+      "crate": "wat",
+      "metadata": {
+        "cve_count": 0,
+        "license": null,
+        "maintenance_score": 50,
+        "transitive_deps": 0
+      },
+      "reasoning": [
+        "Usage simplicity: 70% (0 unique APIs from 0 call sites)",
+        "Transitive value: 55% (removes 0 transitive deps)",
+        "Security safety: 50% (category: general)",
+        "Maintenance burden: 45% (0 CVEs, score: 50)",
+        "Testability: 85% (0 affected files)",
+        "API surface: 90% (using ~0% of public APIs)",
+        "Category rule applied: No special category rule",
+        "Confidence: 100% (based on usage visibility)"
+      ],
+      "score": {
+        "classification": "Safe to Replace",
+        "classification_stars": "★★★★★",
+        "confidence": 100,
+        "dimensions": {
+          "api_surface": 90,
+          "maintenance_burden": 45,
+          "security_safety": 50,
+          "testability": 85,
+          "transitive_value": 55,
+          "usage_simplicity": 70
+        },
+        "overall": 63,
+        "recommendation": "proceed"
+      },
+      "usage": {
+        "affected_files": 0,
+        "call_sites": 0,
+        "imported_items": 0,
+        "is_trivial": true,
+        "unique_apis": 0
+      },
+      "version": "^1"
+    }
+  ],
+  "total_dependencies": 19
+}
