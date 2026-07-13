@@ -27,7 +27,7 @@ gix = "0.85"
 wasmtime = "46"
 wasmtime-wasi = "46"
 axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util", "signal"] }
 clap = { version = "4", features = ["derive"] }
 mime_guess = "2"
 tracing = "0.1"

@@ -4,18 +4,42 @@
 repositories and executed locally by a sandboxed Rust/WebAssembly runtime
 instead of being deployed to a server.
 
-## Status: Milestone 1 — Core Runtime
+## Architecture
 
-| Crate | Role |
-|---|---|
-| `crates/core` | `.grow/manifest.toml` schema, parsing, validation |
-| `crates/git` | Repository loading via gix (pure-Rust git), HEAD verification |
-| `crates/runtime` | wasmtime + WASI preview1, CGI-style invocation, fuel-metered sandbox |
-| `crates/server` | `grow-server` daemon: static assets + WASM request handling on localhost |
-| `crates/cli` | `grow run` / `grow serve` |
+```
++---------------+     +---------------+     +---------------+
+|   grow-cli    |     |  grow-server  |     |  grow-core    |
+|  (commands)   | --> |  (daemon)     | --> | (manifest)    |
++---------------+     +---------------+     +---------------+
+                             |                       |
+                             v                       v
+                      +---------------+     +---------------+
+                      |  grow-git     |     | grow-runtime  |
+                      | (repo loader) |     | (wasm sandbox)|
+                      +---------------+     +---------------+
+```
 
-Later milestones (browser extension, `grow://`, distributed object cache,
-registry) are not implemented yet.
+## Status: Milestone 1 — Core Runtime (SOTA-Enhanced)
+
+| Crate | Role | Tests |
+|---|---|---|
+| `crates/core` | `.grow/manifest.toml` schema, parsing, validation | 17 |
+| `crates/git` | Repository loading via gix (pure-Rust git), HEAD verification | 11 |
+| `crates/runtime` | wasmtime + WASI preview1, CGI-style invocation, fuel-metered sandbox | 4 |
+| `crates/server` | `grow-server` daemon: static assets + WASM request handling + health/metrics | 1 e2e |
+| `crates/cli` | `grow run` / `grow serve` / `grow inspect` | — |
+
+**Security enhancements**: Path traversal protection, restricted WASM features
+(memory64, multi-memory, threads disabled), request body/header limits,
+concurrent invocation limits, 5s wall-clock timeout + fuel metering.
+
+**Production features**: Graceful shutdown (Ctrl+C / SIGTERM), `/healthz` and
+`/metrics` endpoints, structured logging via `tracing`, request body limits,
+CI/CD pipeline via GitHub Actions.
+
+**Quality**: Workspace tests, Clippy warnings-as-errors, formatting checks,
+architecture indexing (Fract), dependency policy (Amber), automated
+benchmarks (Criterion), man pages.
 
 ## Repository contract
 
@@ -53,8 +77,26 @@ fresh instance, CGI-style:
 - **stdout**: `STATUS REASON\n` (e.g. `200 OK`), then headers, a blank line, then the body
 
 Modules receive stdio only — no filesystem, network, environment, or
-arguments. Execution is bounded by fuel metering and a 256 MB linear-memory
-cap; requests also have a 5 s wall-clock timeout in the daemon.
+arguments. Execution is bounded by:
+
+- **Fuel metering**: ~1B instructions per invocation (deterministic)
+- **Memory cap**: 256 MB linear memory per instance
+- **Stack**: Safe stack limits enforced by wasmtime
+- **Wall-clock timeout**: 5s per request (daemon-level)
+- **Output cap**: 16 MB stdout/stderr captured
+- **Request body limit**: 1 MB max body size
+- **Header limits**: 64 headers max, 256B name, 8KB value
+- **WASM feature restrictions**: memory64, multi-memory, threads disabled
+
+## Server endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /healthz` | Liveness probe — returns `ok\n` |
+| `GET /metrics` | Basic metrics — app name, version, commit, `grow_up=1` |
+| `GET /` | Static `index.html` from verified HEAD tree |
+| `GET /path` | Static file if it exists in the repo, else WASM invocation |
+| `POST /path` | WASM invocation (if runtime entry declared) |
 
 ## Build and test
 
@@ -63,27 +105,30 @@ cargo build
 cargo test
 ```
 
-Inspect the exact commit and manifest configuration GROW will use:
+Run benchmarks:
+
+```sh
+cargo bench --workspace
+```
+
+Inspect a repository:
 
 ```sh
 grow inspect /path/to/app
 ```
 
-## Engineering checks
+## Quality audit
 
-Kaptaind monitors the working tree and gates automated commits on the full
-workspace test suite. Run the same local quality audit used for MVP work with:
+Run the full quality audit (format, clippy, tests, fract, amber, kaptaind):
 
 ```sh
 scripts/quality-audit.sh
 ```
 
-The audit covers formatting, warnings-as-errors Clippy, workspace tests,
-Fract architecture indexing, Amber dependency policy, and Kaptaind release
-readiness. Amber must be rerun after dependency or Cargo manifest changes;
-Fract should be rerun after structural changes.
+## CI/CD
 
-Manual pages for the binaries are in `docs/man/`.
+GitHub Actions workflow runs the full quality audit on every push and pull
+request. See `.github/workflows/ci.yml`.
 
 ## Demo
 
@@ -97,11 +142,17 @@ git -C /tmp/hello-demo init -b main
 git -C /tmp/hello-demo add -A
 git -C /tmp/hello-demo -c user.email=demo@grow -c user.name=demo commit -m "hello-app"
 
-# Serve it (http://127.0.0.1:7870)
+# Serve it (http://127.0.0.1:7870) — supports Ctrl+C graceful shutdown
 cargo run -p grow-cli -- serve /tmp/hello-demo
 curl http://127.0.0.1:7870/            # static index.html
+curl http://127.0.0.1:7870/healthz      # liveness probe
+curl http://127.0.0.1:7870/metrics      # basic metrics
 curl http://127.0.0.1:7870/api/hello   # handled by the WASM module
 
 # One-shot execution
 cargo run -p grow-cli -- run /tmp/hello-demo
 ```
+
+## License
+
+MIT OR Apache-2.0

@@ -32,6 +32,8 @@ pub const DEFAULT_PORT: u16 = 7870;
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 /// Maximum request body accepted by the local daemon.
 pub const MAX_REQUEST_BODY_BYTES: usize = 1024 * 1024;
+/// Maximum concurrent WASM invocations allowed.
+pub const MAX_CONCURRENT_WASM: usize = 32;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
@@ -83,7 +85,7 @@ pub struct ServeConfig {
     pub port: u16,
 }
 
-/// Serve a repository on `127.0.0.1:port` until the process is stopped.
+/// Serve a repository on `127.0.0.1:port` with graceful shutdown.
 pub async fn serve(config: ServeConfig) -> Result<(), ServerError> {
     let state = load(&config.repo)?;
     {
@@ -100,9 +102,33 @@ pub async fn serve(config: ServeConfig) -> Result<(), ServerError> {
     let router = app(state);
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     let listener = TcpListener::bind(addr).await?;
-    tracing::info!("serving on http://{addr}");
-    axum::serve(listener, router).await?;
+    tracing::info!("serving on http://{addr} (press Ctrl+C to stop)");
+    axum::serve(listener, router)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+    tracing::info!("server shutdown complete");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 async fn healthz() -> &'static str {
