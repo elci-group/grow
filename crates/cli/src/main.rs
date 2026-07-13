@@ -75,9 +75,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn inspect(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let repo = Repository::open(repo_path).map_err(|e| {
-        format!("failed to open repository '{}': {}", repo_path.display(), e)
-    })?;
+    let repo = Repository::open(repo_path)
+        .map_err(|e| format!("failed to open repository '{}': {}", repo_path.display(), e))?;
     let manifest = repo.manifest();
     println!("name:        {}", manifest.grow.name);
     println!("version:     {}", manifest.grow.version);

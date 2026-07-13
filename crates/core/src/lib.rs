@@ -177,7 +177,11 @@ pub fn is_valid_quota(quota: &str) -> bool {
     let suffixes = ["b", "kb", "mb", "gb", "tb"];
     let lower = trimmed.to_lowercase();
     suffixes.iter().any(|suffix| {
-        lower.ends_with(suffix) && lower[..lower.len() - suffix.len()].trim().parse::<f64>().is_ok()
+        lower.ends_with(suffix)
+            && lower[..lower.len() - suffix.len()]
+                .trim()
+                .parse::<f64>()
+                .is_ok()
     })
 }
 

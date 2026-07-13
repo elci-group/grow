@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 const ECHO_WAT: &str = r#"(module
   (import "wasi_snapshot_preview1" "fd_read" (func $fd_read (param i32 i32 i32 i32) (result i32)))
@@ -49,5 +49,10 @@ fn bench_response_parse(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_wasm_invocation, bench_wasm_compile, bench_response_parse);
+criterion_group!(
+    benches,
+    bench_wasm_invocation,
+    bench_wasm_compile,
+    bench_response_parse
+);
 criterion_main!(benches);

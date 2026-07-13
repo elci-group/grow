@@ -11,15 +11,18 @@
 //! WASM invocations run on a blocking thread with a wall-clock timeout on
 //! top of the runtime's fuel metering.
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
+use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response as HttpResponse};
 use axum::routing::get;
 use grow_git::{GitError, Repository};
@@ -34,6 +37,8 @@ pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 pub const MAX_REQUEST_BODY_BYTES: usize = 1024 * 1024;
 /// Maximum concurrent WASM invocations allowed.
 pub const MAX_CONCURRENT_WASM: usize = 32;
+/// Maximum requests per minute from a single IP.
+pub const RATE_LIMIT_PER_MINUTE: u64 = 120;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
@@ -49,11 +54,66 @@ pub enum ServerError {
 pub struct AppState {
     repo: Repository,
     runtime: Option<Arc<Runtime>>,
+    metrics: RequestMetrics,
+    rate_limiter: RateLimiter,
 }
 
 impl AppState {
     pub fn manifest(&self) -> &grow_core::Manifest {
         self.repo.manifest()
+    }
+}
+
+/// Request metrics counters.
+pub struct RequestMetrics {
+    total: AtomicU64,
+    errors: AtomicU64,
+    total_duration_ms: AtomicU64,
+}
+
+impl RequestMetrics {
+    fn new() -> Self {
+        Self {
+            total: AtomicU64::new(0),
+            errors: AtomicU64::new(0),
+            total_duration_ms: AtomicU64::new(0),
+        }
+    }
+
+    fn record(&self, duration: Duration, error: bool) {
+        self.total.fetch_add(1, Ordering::Relaxed);
+        self.total_duration_ms
+            .fetch_add(duration.as_millis() as u64, Ordering::Relaxed);
+        if error {
+            self.errors.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+/// Simple in-memory rate limiter (IP-based, per-minute window).
+struct RateLimiter {
+    buckets: Mutex<HashMap<String, (u64, Instant)>>,
+}
+
+impl RateLimiter {
+    fn new() -> Self {
+        Self {
+            buckets: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn check(&self, ip: &str) -> bool {
+        let mut buckets = self.buckets.lock().unwrap();
+        let now = Instant::now();
+        let window = Duration::from_secs(60);
+        let entry = buckets.entry(ip.to_string()).or_insert((0, now));
+        if now.duration_since(entry.1) > window {
+            entry.1 = now;
+            entry.0 = 1;
+            return true;
+        }
+        entry.0 += 1;
+        entry.0 <= RATE_LIMIT_PER_MINUTE
     }
 }
 
@@ -67,7 +127,12 @@ pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
         }
         None => None,
     };
-    Ok(Arc::new(AppState { repo, runtime }))
+    Ok(Arc::new(AppState {
+        repo,
+        runtime,
+        metrics: RequestMetrics::new(),
+        rate_limiter: RateLimiter::new(),
+    }))
 }
 
 /// Build the HTTP router for a loaded application.
@@ -77,6 +142,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/metrics", get(metrics))
         .fallback(handle_request)
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_and_trace,
+        ))
         .with_state(state)
 }
 
@@ -138,12 +207,21 @@ async fn healthz() -> &'static str {
 async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mut output = String::new();
     output.push_str("# GROW server metrics\n");
-    output.push_str(&format!("# app={} version={} commit={}\n", 
+    output.push_str(&format!(
+        "# app={} version={} commit={}\n",
         state.repo.manifest().grow.name,
         state.repo.manifest().grow.version,
-        state.repo.head_commit()));
+        state.repo.head_commit()
+    ));
     output.push_str("grow_up 1\n");
-    (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")], output)
+    (
+        StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        output,
+    )
 }
 
 async fn handle_request(

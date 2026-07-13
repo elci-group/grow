@@ -230,7 +230,11 @@ entry = "main.wasm"
             .current_dir(dir.path())
             .output()
             .expect("git runs");
-        assert!(out.status.success(), "git init --bare failed: {}", String::from_utf8_lossy(&out.stderr));
+        assert!(
+            out.status.success(),
+            "git init --bare failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         let err = Repository::open(dir.path()).unwrap_err();
         assert!(matches!(err, GitError::Bare));
     }
@@ -298,8 +302,20 @@ entry = "main.wasm"
                 .expect("git runs");
             assert!(out.status.success());
         };
-        git(&["-c", "user.email=test@grow", "-c", "user.name=test", "commit", "--amend", "-m", "fixture"]);
+        git(&[
+            "-c",
+            "user.email=test@grow",
+            "-c",
+            "user.name=test",
+            "commit",
+            "--amend",
+            "-m",
+            "fixture",
+        ]);
         let repo = Repository::open(dir.path()).unwrap();
-        assert!(matches!(repo.read_file(".grow"), Err(GitError::NotRegularFile(_))));
+        assert!(matches!(
+            repo.read_file(".grow"),
+            Err(GitError::NotRegularFile(_))
+        ));
     }
 }
