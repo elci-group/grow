@@ -79,6 +79,10 @@ pub enum ManifestError {
     Parse(#[from] toml::de::Error),
     #[error("grow.name must not be empty")]
     MissingName,
+    #[error("grow.name must be at most 128 characters, got {0}")]
+    NameTooLong(usize),
+    #[error("grow.version must not be empty")]
+    MissingVersion,
     #[error("runtime.engine is required when a [runtime] section is present")]
     MissingEngine,
     #[error("unsupported runtime engine {0:?} (supported: \"wasm\")")]
@@ -87,6 +91,8 @@ pub enum ManifestError {
     MissingEntry,
     #[error("runtime.entry must be a relative path without '..': {0:?}")]
     BadEntry(String),
+    #[error("storage.quota format is invalid: {0:?}")]
+    BadQuota(String),
 }
 
 impl Manifest {
@@ -100,6 +106,17 @@ impl Manifest {
     pub fn validate(&self) -> Result<(), ManifestError> {
         if self.grow.name.trim().is_empty() {
             return Err(ManifestError::MissingName);
+        }
+        if self.grow.name.len() > 128 {
+            return Err(ManifestError::NameTooLong(self.grow.name.len()));
+        }
+        if self.grow.version.trim().is_empty() {
+            return Err(ManifestError::MissingVersion);
+        }
+        if let Some(quota) = &self.storage.quota {
+            if !is_valid_quota(quota) {
+                return Err(ManifestError::BadQuota(quota.clone()));
+            }
         }
         if let Some(runtime) = &self.runtime {
             let engine = runtime
@@ -144,6 +161,19 @@ pub fn is_safe_relative_path(path: &str) -> bool {
     }
     !p.components()
         .any(|c| matches!(c, Component::ParentDir | Component::Prefix(_)))
+}
+
+/// Validate a storage quota string (e.g. "500mb", "1gb", "2.5tb").
+pub fn is_valid_quota(quota: &str) -> bool {
+    let trimmed = quota.trim();
+    if trimmed.is_empty() {
+        return true; // empty quota is valid (no limit)
+    }
+    let suffixes = ["b", "kb", "mb", "gb", "tb"];
+    let lower = trimmed.to_lowercase();
+    suffixes.iter().any(|suffix| {
+        lower.ends_with(suffix) && lower[..lower.len() - suffix.len()].trim().parse::<f64>().is_ok()
+    })
 }
 
 #[cfg(test)]
