@@ -177,6 +177,11 @@ impl Runtime {
     pub fn new(wasm: &[u8]) -> Result<Self, RuntimeError> {
         let mut config = Config::new();
         config.consume_fuel(true);
+        // Restrict compilation resources to prevent host DoS from malicious modules.
+        config.wasm_memory64(false);
+        config.wasm_multi_memory(false);
+        config.wasm_threads(false);
+        config.max_wasm_stack(MAX_STACK_BYTES);
         let engine = Engine::new(&config).map_err(|e| RuntimeError::Engine(e.to_string()))?;
         let module = Module::new(&engine, wasm).map_err(|e| RuntimeError::Engine(e.to_string()))?;
         Ok(Self { engine, module })
@@ -240,7 +245,7 @@ impl Runtime {
 
     /// Invoke the module and parse its stdout as a [`Response`].
     pub fn invoke(&self, request: &Request) -> Result<Response, RuntimeError> {
-        parse_response(&self.run_raw(&request.frame())?)
+        parse_response(&self.run_raw(&request.frame()?)?)
     }
 }
 
