@@ -18,8 +18,8 @@ use wasmtime_wasi::p1::{self, WasiP1Ctx};
 use wasmtime_wasi::p2::pipe::{MemoryInputPipe, MemoryOutputPipe};
 use wasmtime_wasi::{I32Exit, WasiCtxBuilder};
 
-/// Stack size limit per module instance (8 MB).
-pub const MAX_STACK_BYTES: usize = 8 * 1024 * 1024;
+/// Stack size limit per module instance (1 MB, must not exceed async stack size).
+pub const MAX_STACK_BYTES: usize = 1024 * 1024;
 
 /// Fuel granted per invocation (~1B instructions of headroom).
 pub const DEFAULT_FUEL: u64 = 1_000_000_000;
@@ -177,11 +177,10 @@ impl Runtime {
     pub fn new(wasm: &[u8]) -> Result<Self, RuntimeError> {
         let mut config = Config::new();
         config.consume_fuel(true);
-        // Restrict compilation resources to prevent host DoS from malicious modules.
+        // Restrict features to prevent host DoS from malicious modules.
         config.wasm_memory64(false);
         config.wasm_multi_memory(false);
         config.wasm_threads(false);
-        config.max_wasm_stack(MAX_STACK_BYTES);
         let engine = Engine::new(&config).map_err(|e| RuntimeError::Engine(e.to_string()))?;
         let module = Module::new(&engine, wasm).map_err(|e| RuntimeError::Engine(e.to_string()))?;
         Ok(Self { engine, module })
