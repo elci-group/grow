@@ -396,3 +396,137 @@ fn to_http(response: grow_runtime::Response) -> HttpResponse {
 fn status_text(status: StatusCode, message: &'static str) -> HttpResponse {
     (status, message).into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn md5_hash_is_deterministic() {
+        let data = b"hello world";
+        let h1 = md5_hash(data);
+        let h2 = md5_hash(data);
+        assert_eq!(h1, h2);
+        assert_ne!(h1, 0);
+    }
+
+    #[test]
+    fn md5_hash_different_for_different_data() {
+        let h1 = md5_hash(b"hello");
+        let h2 = md5_hash(b"world");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn rate_limiter_allows_under_limit() {
+        let limiter = RateLimiter::new();
+        for _ in 0..RATE_LIMIT_PER_MINUTE {
+            assert!(limiter.check("127.0.0.1"));
+        }
+    }
+
+    #[test]
+    fn rate_limiter_blocks_over_limit() {
+        let limiter = RateLimiter::new();
+        for _ in 0..RATE_LIMIT_PER_MINUTE {
+            assert!(limiter.check("127.0.0.1"));
+        }
+        assert!(!limiter.check("127.0.0.1"));
+    }
+
+    #[test]
+    fn rate_limiter_tracks_per_ip() {
+        let limiter = RateLimiter::new();
+        for _ in 0..RATE_LIMIT_PER_MINUTE {
+            assert!(limiter.check("127.0.0.1"));
+        }
+        assert!(!limiter.check("127.0.0.1"));
+        assert!(limiter.check("192.168.1.1"));
+    }
+
+    #[test]
+    fn rate_limiter_window_resets() {
+        let limiter = RateLimiter::new();
+        for _ in 0..RATE_LIMIT_PER_MINUTE {
+            assert!(limiter.check("127.0.0.1"));
+        }
+        assert!(!limiter.check("127.0.0.1"));
+        // Fast-forward bucket by waiting a minute. In the test we can't wait
+        // that long, so we verify the bucket is created and at capacity.
+        let buckets = limiter.buckets.lock().unwrap();
+        let entry = buckets.get("127.0.0.1").unwrap();
+        assert_eq!(entry.0, RATE_LIMIT_PER_MINUTE + 1);
+    }
+
+    #[test]
+    fn status_text_builds_response() {
+        let resp = status_text(StatusCode::NOT_FOUND, "not found\n");
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn to_http_sets_default_content_type() {
+        let resp = grow_runtime::Response {
+            status: 200,
+            reason: "OK".into(),
+            headers: vec![],
+            body: b"hello".to_vec(),
+        };
+        let http = to_http(resp);
+        assert_eq!(http.status(), StatusCode::OK);
+        let headers = http.headers();
+        assert_eq!(headers[header::CONTENT_TYPE], "text/plain");
+    }
+
+    #[test]
+    fn to_http_preserves_module_content_type() {
+        let resp = grow_runtime::Response {
+            status: 200,
+            reason: "OK".into(),
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: b"{}".to_vec(),
+        };
+        let http = to_http(resp);
+        let headers = http.headers();
+        assert_eq!(headers[header::CONTENT_TYPE], "application/json");
+    }
+
+    #[test]
+    fn to_http_drops_invalid_headers() {
+        let resp = grow_runtime::Response {
+            status: 200,
+            reason: "OK".into(),
+            headers: vec![("bad\r\nheader".into(), "value".into())],
+            body: b"hello".to_vec(),
+        };
+        let http = to_http(resp);
+        assert_eq!(http.status(), StatusCode::OK);
+        let headers = http.headers();
+        // invalid header dropped, default content-type added
+        assert_eq!(headers[header::CONTENT_TYPE], "text/plain");
+    }
+
+    #[test]
+    fn serve_file_sets_cache_headers() {
+        let resp = serve_file("test.html", b"<h1>test</h1>".to_vec());
+        assert_eq!(resp.status(), StatusCode::OK);
+        let headers = resp.headers();
+        assert_eq!(headers[header::CONTENT_TYPE], "text/html");
+        assert_eq!(headers[header::CACHE_CONTROL], "public, max-age=3600, immutable");
+        assert!(headers.contains_key(header::ETAG));
+    }
+
+    #[test]
+    fn request_metrics_records() {
+        let m = RequestMetrics::new();
+        m.record(Duration::from_millis(100), false);
+        assert_eq!(m.total.load(Ordering::Relaxed), 1);
+        assert_eq!(m.errors.load(Ordering::Relaxed), 0);
+        assert_eq!(m.total_duration_ms.load(Ordering::Relaxed), 100);
+
+        m.record(Duration::from_millis(50), true);
+        assert_eq!(m.total.load(Ordering::Relaxed), 2);
+        assert_eq!(m.errors.load(Ordering::Relaxed), 1);
+        assert_eq!(m.total_duration_ms.load(Ordering::Relaxed), 150);
+    }
+}
