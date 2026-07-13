@@ -172,9 +172,12 @@ pub async fn serve(config: ServeConfig) -> Result<(), ServerError> {
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!("serving on http://{addr} (press Ctrl+C to stop)");
-    axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     tracing::info!("server shutdown complete");
     Ok(())
 }
@@ -214,6 +217,20 @@ async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         state.repo.head_commit()
     ));
     output.push_str("grow_up 1\n");
+    output.push_str(&format!(
+        "requests_total {}\n",
+        state.metrics.total.load(Ordering::Relaxed)
+    ));
+    output.push_str(&format!(
+        "requests_errors {}\n",
+        state.metrics.errors.load(Ordering::Relaxed)
+    ));
+    let total_ms = state.metrics.total_duration_ms.load(Ordering::Relaxed);
+    let total_req = state.metrics.total.load(Ordering::Relaxed).max(1);
+    output.push_str(&format!(
+        "request_duration_avg_ms {}\n",
+        total_ms / total_req
+    ));
     (
         StatusCode::OK,
         [(
@@ -222,6 +239,42 @@ async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         )],
         output,
     )
+}
+
+async fn rate_limit_and_trace(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    req: axum::http::Request<axum::body::Body>,
+    next: Next,
+) -> impl IntoResponse {
+    let ip = addr.ip().to_string();
+    let method = req.method().to_string();
+    let path = req.uri().path().to_string();
+    let start = Instant::now();
+    let req_id = format!("{:016x}", start.elapsed().as_nanos() as u64);
+
+    if !state.rate_limiter.check(&ip) {
+        tracing::warn!(%ip, %method, %path, "rate limit exceeded");
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate limit exceeded (120 req/min)\n",
+        )
+            .into_response();
+    }
+
+    tracing::info!(req_id = %req_id, %ip, %method, %path, "request started");
+    let response = next.run(req).await;
+    let duration = start.elapsed();
+    let status = response.status();
+    let error = status.is_server_error();
+    state.metrics.record(duration, error);
+
+    if error {
+        tracing::error!(req_id = %req_id, %status, ?duration, "request failed");
+    } else {
+        tracing::info!(req_id = %req_id, %status, ?duration, "request completed");
+    }
+    response
 }
 
 async fn handle_request(

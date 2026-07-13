@@ -87,6 +87,10 @@ async fn request(
             Request::builder()
                 .method(method)
                 .uri(path)
+                .extension(axum::extract::ConnectInfo(std::net::SocketAddr::from((
+                    [127, 0, 0, 1],
+                    12345,
+                ))))
                 .body(body)
                 .expect("request builds"),
         )
