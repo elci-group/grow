@@ -138,9 +138,12 @@ async fn serves_static_wasm_and_blocks_traversal() {
     assert!(!body.contains("[workspace]"), "{body}");
 
     // Liveness probe.
-    let (status, _head, body) = request(app.clone(), "GET", "/healthz", Body::empty()).await;
+    let (status, head, body) = request(app.clone(), "GET", "/healthz", Body::empty()).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, "ok\n");
+
+    // CORS headers are present on responses.
+    assert!(head.to_lowercase().contains("access-control-allow-origin"), "{head}");
 
     let oversized = vec![b'x'; grow_server::MAX_REQUEST_BODY_BYTES + 1];
     let (status, _head, _body) = request(app, "POST", "/api/thing", Body::from(oversized)).await;

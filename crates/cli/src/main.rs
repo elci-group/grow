@@ -78,13 +78,13 @@ fn inspect(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let repo = Repository::open(repo_path)
         .map_err(|e| format!("failed to open repository '{}': {}", repo_path.display(), e))?;
     let manifest = repo.manifest();
-    println!("name:        {}", manifest.grow.name);
-    println!("version:     {}", manifest.grow.version);
-    println!("commit:      {}", repo.head_commit());
-    println!("runtime:     {}", manifest.wasm_entry().unwrap_or("static"));
-    println!("network:     {}", manifest.network.enabled.unwrap_or(false));
+    println!("\x1b[1;36mname\x1b[0m        {}", manifest.grow.name);
+    println!("\x1b[1;36mversion\x1b[0m     {}", manifest.grow.version);
+    println!("\x1b[1;36mcommit\x1b[0m      {}", repo.head_commit());
+    println!("\x1b[1;36mruntime\x1b[0m     {}", manifest.wasm_entry().unwrap_or("\x1b[33mstatic\x1b[0m"));
+    println!("\x1b[1;36mnetwork\x1b[0m     {}", manifest.network.enabled.unwrap_or(false));
     println!(
-        "permissions: filesystem={:?}, camera={:?}, microphone={:?}",
+        "\x1b[1;36mpermissions\x1b[0m filesystem={:?}, camera={:?}, microphone={:?}",
         manifest.permissions.filesystem,
         manifest.permissions.camera,
         manifest.permissions.microphone

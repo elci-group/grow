@@ -28,6 +28,7 @@ use axum::routing::get;
 use grow_git::{GitError, Repository};
 use grow_runtime::{Request, Runtime};
 use tokio::net::TcpListener;
+use tower_http::cors::CorsLayer;
 
 pub const DEFAULT_PORT: u16 = 7870;
 /// Wall-clock ceiling per WASM invocation (fuel metering bounds CPU work;
@@ -142,6 +143,7 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/metrics", get(metrics))
         .fallback(handle_request)
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
+        .layer(CorsLayer::permissive())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             rate_limit_and_trace,
