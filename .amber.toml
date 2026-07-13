@@ -1,0 +1,6 @@
+threshold = 70
+
+[policy]
+required = ["serde", "toml", "thiserror"]
+forbidden = []
+strict = false

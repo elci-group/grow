@@ -1,0 +1,18 @@
+[grow]
+name = "hello-app"
+version = "0.1.0"
+
+[runtime]
+engine = "wasm"
+entry = "main.wasm"
+
+[network]
+enabled = false
+
+[storage]
+quota = "50mb"
+
+[permissions]
+filesystem = "restricted"
+camera = false
+microphone = false

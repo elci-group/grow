@@ -1,0 +1,21 @@
+[package]
+name = "grow-cli"
+description = "GROW user-facing CLI (`grow run` / `grow serve`)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+grow-core.workspace = true
+grow-git.workspace = true
+grow-runtime.workspace = true
+grow-server.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[[bin]]
+name = "grow"
+path = "src/main.rs"

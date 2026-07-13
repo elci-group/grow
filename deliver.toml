@@ -1,0 +1,24 @@
+[[file]]
+path = "Cargo.toml"
+required = true
+
+[[file]]
+path = "README.md"
+required = true
+
+[[file]]
+path = "scripts/quality-audit.sh"
+required = true
+
+[[command]]
+name = "workspace tests"
+cmd = ["cargo", "test", "--workspace"]
+expect_exit = 0
+timeout_secs = 300
+stdout_contains = ["test result: ok"]
+
+[[command]]
+name = "workspace clippy"
+cmd = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+expect_exit = 0
+timeout_secs = 300

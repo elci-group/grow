@@ -1,0 +1,12 @@
+# Common
+.git
+.kaptaind
+.agents
+.codex
+.fract
+.DS_Store
+*.swp
+*.swo
+
+# Rust
+target

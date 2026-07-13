@@ -1,0 +1,15 @@
+[package]
+name = "grow-runtime"
+description = "GROW WebAssembly runtime (wasmtime, WASI preview1, CGI-style invocation)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+wat.workspace = true

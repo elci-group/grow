@@ -1,0 +1,15 @@
+[package]
+name = "grow-git"
+description = "GROW repository loading via gix (pure-Rust git)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+grow-core.workspace = true
+gix.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
