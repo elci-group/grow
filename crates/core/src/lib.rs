@@ -159,8 +159,12 @@ pub fn is_safe_relative_path(path: &str) -> bool {
     if p.is_absolute() {
         return false;
     }
-    !p.components()
-        .any(|c| matches!(c, Component::ParentDir | Component::Prefix(_)))
+    !p.components().any(|c| {
+        matches!(
+            c,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir
+        )
+    })
 }
 
 /// Validate a storage quota string (e.g. "500mb", "1gb", "2.5tb", "100").
