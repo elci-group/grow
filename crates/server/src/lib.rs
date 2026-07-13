@@ -523,10 +523,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let headers = resp.headers();
         assert_eq!(headers[header::CONTENT_TYPE], "text/html");
-        assert_eq!(
-            headers[header::CACHE_CONTROL],
-            "public, max-age=3600, immutable"
-        );
+        assert_eq!(headers[header::CACHE_CONTROL], "public, max-age=3600, immutable");
         assert!(headers.contains_key(header::ETAG));
     }
 
