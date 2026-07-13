@@ -223,20 +223,83 @@ entry = "main.wasm"
     }
 
     #[test]
-    fn working_tree_changes_are_not_served() {
+    fn bare_repo_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = Command::new("git")
+            .args(&["init", "--bare", "-b", "main"])
+            .current_dir(dir.path())
+            .output()
+            .expect("git runs");
+        assert!(out.status.success(), "git init --bare failed: {}", String::from_utf8_lossy(&out.stderr));
+        let err = Repository::open(dir.path()).unwrap_err();
+        assert!(matches!(err, GitError::Bare));
+    }
+
+    #[test]
+    fn read_file_returns_exact_bytes() {
         let dir = fixture_repo(true);
         let repo = Repository::open(dir.path()).unwrap();
-        fs::write(dir.path().join("hello.txt"), "uncommitted replacement").unwrap();
-        fs::write(dir.path().join("untracked.txt"), "untracked").unwrap();
+        let bytes = repo.read_file("hello.txt").unwrap();
+        assert_eq!(bytes, b"hello fixture");
+    }
 
-        assert_eq!(repo.read_file("hello.txt").unwrap(), b"hello fixture");
+    #[test]
+    fn contains_file_detects_present_and_absent() {
+        let dir = fixture_repo(true);
+        let repo = Repository::open(dir.path()).unwrap();
+        assert!(repo.contains_file("hello.txt"));
+        assert!(repo.contains_file(".grow/manifest.toml"));
+        assert!(!repo.contains_file("nonexistent.txt"));
+    }
+
+    #[test]
+    fn path_traversal_is_blocked() {
+        let dir = fixture_repo(true);
+        let repo = Repository::open(dir.path()).unwrap();
         assert!(matches!(
-            repo.read_file("untracked.txt"),
+            repo.read_file("../outside.txt"),
             Err(GitError::MissingFile(_))
         ));
         assert!(matches!(
-            repo.read_file("../../etc/passwd"),
+            repo.read_file("a/../../b"),
             Err(GitError::MissingFile(_))
         ));
+    }
+
+    #[test]
+    fn repo_without_git_dir_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = Repository::open(dir.path()).unwrap_err();
+        assert!(matches!(err, GitError::Open { .. }));
+    }
+
+    #[test]
+    fn manifest_path_is_constant() {
+        assert_eq!(grow_core::MANIFEST_PATH, ".grow/manifest.toml");
+    }
+
+    #[test]
+    fn root_returns_canonical_path() {
+        let dir = fixture_repo(true);
+        let repo = Repository::open(dir.path()).unwrap();
+        let root = repo.root();
+        assert!(root.is_absolute());
+        assert!(root.exists());
+    }
+
+    #[test]
+    fn directories_are_not_regular_files() {
+        let dir = fixture_repo(true);
+        let git = |args: &[&str]| {
+            let out = Command::new("git")
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .expect("git runs");
+            assert!(out.status.success());
+        };
+        git(&["-c", "user.email=test@grow", "-c", "user.name=test", "commit", "--amend", "-m", "fixture"]);
+        let repo = Repository::open(dir.path()).unwrap();
+        assert!(matches!(repo.read_file(".grow"), Err(GitError::NotRegularFile(_))));
     }
 }

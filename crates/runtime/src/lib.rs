@@ -18,12 +18,23 @@ use wasmtime_wasi::p1::{self, WasiP1Ctx};
 use wasmtime_wasi::p2::pipe::{MemoryInputPipe, MemoryOutputPipe};
 use wasmtime_wasi::{I32Exit, WasiCtxBuilder};
 
+/// Stack size limit per module instance (8 MB).
+pub const MAX_STACK_BYTES: usize = 8 * 1024 * 1024;
+
 /// Fuel granted per invocation (~1B instructions of headroom).
 pub const DEFAULT_FUEL: u64 = 1_000_000_000;
 /// Linear-memory cap per module instance.
 pub const MAX_MEMORY_BYTES: usize = 256 * 1024 * 1024;
 /// Cap on captured stdout/stderr.
 pub const MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
+/// Maximum request body that a module will receive (1 MB).
+pub const MAX_REQUEST_BODY_BYTES: usize = 1024 * 1024;
+/// Maximum number of headers in a request.
+pub const MAX_HEADERS: usize = 64;
+/// Maximum header name length.
+pub const MAX_HEADER_NAME_BYTES: usize = 256;
+/// Maximum header value length.
+pub const MAX_HEADER_VALUE_BYTES: usize = 8192;
 
 /// An application request, framed onto the module's stdin.
 #[derive(Debug, Clone, Default)]
@@ -36,7 +47,38 @@ pub struct Request {
 
 impl Request {
     /// Serialize to the stdin frame format.
-    pub fn frame(&self) -> Vec<u8> {
+    /// Validates limits before framing; returns an error if any limit is exceeded.
+    pub fn frame(&self) -> Result<Vec<u8>, RuntimeError> {
+        if self.headers.len() > MAX_HEADERS {
+            return Err(RuntimeError::BadResponse(format!(
+                "too many headers: {} (max {})",
+                self.headers.len(),
+                MAX_HEADERS
+            )));
+        }
+        for (name, value) in &self.headers {
+            if name.len() > MAX_HEADER_NAME_BYTES {
+                return Err(RuntimeError::BadResponse(format!(
+                    "header name too long: {} bytes (max {})",
+                    name.len(),
+                    MAX_HEADER_NAME_BYTES
+                )));
+            }
+            if value.len() > MAX_HEADER_VALUE_BYTES {
+                return Err(RuntimeError::BadResponse(format!(
+                    "header value too long: {} bytes (max {})",
+                    value.len(),
+                    MAX_HEADER_VALUE_BYTES
+                )));
+            }
+        }
+        if self.body.len() > MAX_REQUEST_BODY_BYTES {
+            return Err(RuntimeError::BadResponse(format!(
+                "body too large: {} bytes (max {})",
+                self.body.len(),
+                MAX_REQUEST_BODY_BYTES
+            )));
+        }
         let mut frame = format!("{} {}\n", self.method, self.path).into_bytes();
         for (name, value) in &self.headers {
             frame.extend_from_slice(name.as_bytes());
@@ -46,7 +88,7 @@ impl Request {
         }
         frame.push(b'\n');
         frame.extend_from_slice(&self.body);
-        frame
+        Ok(frame)
     }
 }
 
