@@ -11,7 +11,10 @@ use grow_runtime::{Request, Runtime};
 #[command(
     name = "grow",
     version,
-    about = "GROW — Git Repository Oriented Web runtime"
+    about = "GROW — Git Repository Oriented Web runtime",
+    long_about = "GROW (Git Repository Oriented Web runtime) executes applications \
+published as git repositories in a sandboxed WebAssembly environment. \
+Applications are served locally instead of being deployed to a server."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -21,20 +24,31 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Print the verified application identity and runtime configuration
+    ///
+    /// Loads the repository, verifies the HEAD commit, and displays the
+    /// manifest configuration including runtime engine, entry point, and
+    /// permissions.
     Inspect {
         /// Path to the GROW repository
         repo: PathBuf,
     },
     /// Execute the repository's WASM entry once and print the response
+    ///
+    /// Runs the application's WASM module in a fresh sandboxed instance
+    /// with a GET / request and prints the response status, headers, and body.
     Run {
         /// Path to the GROW repository
         repo: PathBuf,
     },
     /// Start the local daemon serving the repository on localhost
+    ///
+    /// Serves static assets from the repository's verified HEAD tree and
+    /// routes non-asset requests to the WASM entry module. The server runs
+    /// until interrupted (Ctrl+C).
     Serve {
         /// Path to the GROW repository
         repo: PathBuf,
-        /// Localhost port to listen on
+        /// Localhost port to listen on (default: 7870)
         #[arg(short, long, default_value_t = grow_server::DEFAULT_PORT)]
         port: u16,
     },
@@ -61,12 +75,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn inspect(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let repo = Repository::open(repo_path)?;
+    let repo = Repository::open(repo_path).map_err(|e| {
+        format!("failed to open repository '{}': {}", repo_path.display(), e)
+    })?;
     let manifest = repo.manifest();
-    println!("name: {}", manifest.grow.name);
-    println!("version: {}", manifest.grow.version);
-    println!("commit: {}", repo.head_commit());
-    println!("runtime: {}", manifest.wasm_entry().unwrap_or("static"));
+    println!("name:        {}", manifest.grow.name);
+    println!("version:     {}", manifest.grow.version);
+    println!("commit:      {}", repo.head_commit());
+    println!("runtime:     {}", manifest.wasm_entry().unwrap_or("static"));
+    println!("network:     {}", manifest.network.enabled.unwrap_or(false));
+    println!(
+        "permissions: filesystem={:?}, camera={:?}, microphone={:?}",
+        manifest.permissions.filesystem,
+        manifest.permissions.camera,
+        manifest.permissions.microphone
+    );
     Ok(())
 }
 

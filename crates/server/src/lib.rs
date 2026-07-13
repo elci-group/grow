@@ -72,6 +72,7 @@ pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
 pub fn app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
+        .route("/metrics", get(metrics))
         .fallback(handle_request)
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
         .with_state(state)
@@ -106,6 +107,17 @@ pub async fn serve(config: ServeConfig) -> Result<(), ServerError> {
 
 async fn healthz() -> &'static str {
     "ok\n"
+}
+
+async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let mut output = String::new();
+    output.push_str("# GROW server metrics\n");
+    output.push_str(&format!("# app={} version={} commit={}\n", 
+        state.repo.manifest().grow.name,
+        state.repo.manifest().grow.version,
+        state.repo.head_commit()));
+    output.push_str("grow_up 1\n");
+    (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")], output)
 }
 
 async fn handle_request(
