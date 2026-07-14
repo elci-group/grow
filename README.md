@@ -131,6 +131,27 @@ no storage grant (the module receives stdio only).
 | `GET /path` | Static file if it exists in the repo, else WASM invocation |
 | `POST /path` | WASM invocation (if runtime entry declared) |
 
+## `grow://` URLs and the browser extension
+
+`grow daemon` runs a resolver control plane on `127.0.0.1:7890` for the
+Chrome extension in `extension/`. It answers
+`GET /resolve?u=grow://<host>/<owner>/<repo>[/path]`: on first use the app
+is cloned over https (`github.com` and `gitlab.com` only — credentials in
+URLs are rejected), verified, installed into the registry, and served on a
+per-app localhost port with the usual approval and storage policy; the
+extension then navigates the tab to the returned URL.
+
+```sh
+./target/release/grow daemon
+curl 'http://127.0.0.1:7890/resolve?u=grow://github.com/elci-group/octo-site'
+# {"app":"octo-site","port":7901,"url":"http://127.0.0.1:7901/",...}
+```
+
+Resolving never updates an installed app: a moved remote keeps serving the
+installed commit until `grow install <url>` is run again, matching the CLI
+trust model. See `extension/README.md` for browser setup (Load unpacked),
+the omnibox keyword (`grow` + Tab), link interception, and the popup.
+
 ## Build and test
 
 ```sh

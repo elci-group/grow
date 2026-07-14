@@ -1,4 +1,4 @@
-.TH GROW 1 "2026-07-14" "GROW 0.1.21" "User Commands"
+.TH GROW 1 "2026-07-14" "GROW 0.2.2" "User Commands"
 .SH NAME
 grow \- Git Repository Oriented Web runtime command-line interface
 .SH SYNOPSIS
@@ -33,14 +33,18 @@ and storage handling match
 Register an app in the local registry: verified commit, manifest identity,
 source path, requested capabilities, and an approval record.
 .I REPO
-is a local repository path or a
+is a local repository path, a
 .BR file://
-URL; other URL schemes are rejected. Cloned sources are kept in the registry
-cache until the app is removed. Cloning spawns
-.BR git-upload-pack ,
-so a
+URL, or an
+.BR https://
+URL on github.com or gitlab.com; other schemes, other hosts, and URLs
+carrying credentials are rejected. Remote clones are shallow and spawn the
+host
+.BR git
+binary, as does gix's file transport, so
 .B git
-binary must be available on the host. Apps declaring host capabilities
+must be available on the host. Cloned sources are kept in the registry
+cache until the app is removed. Apps declaring host capabilities
 (network, camera, microphone, clipboard, notifications, or full filesystem)
 require
 .BR --approve-capabilities .
@@ -52,6 +56,16 @@ List installed apps with version, short commit, and source path.
 Remove an installed app's registry metadata and storage, plus the cached
 clone when the app was installed from a clone source. External source
 repositories are never touched.
+.TP
+.B daemon [--port \fIPORT\fR]
+Run the grow:// resolver control plane for the browser extension (default
+port 7890). It answers
+.BR /resolve?u=grow://<host>/<owner>/<repo>[/path]
+for github.com and gitlab.com repositories: the app is cloned and installed
+on first use, served on a per-app localhost port with the approval record
+and storage grant enforced, and the localhost URL is returned as JSON. See
+.IR extension/README.md
+for browser setup.
 .SH APPROVAL
 Before every run or serve of an installed app, the verified HEAD commit and
 the install-time approval record are checked. If the repository moved since

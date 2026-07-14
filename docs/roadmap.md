@@ -76,8 +76,10 @@ by runtime capability, operations, ecosystem, and external validation.
 
 ## Current Non-SOTA Gaps
 
-- Install clones local paths and `file://` URLs only; network remotes,
-  upgrade, rollback, and signing are not implemented.
+- Install clones local paths, `file://` URLs, and `https://` remotes on
+  github.com/gitlab.com (shallow, via the host `git` binary); upgrade,
+  rollback, and signing are not implemented, and GitLab subgroups are not
+  parsed by the `grow://` flow.
 - Fract and Amber are fail-fast in the local audit script, but advisory in the
   GitHub workflow until their installation story is pinned.
 - There is no published benchmark or comparison matrix yet.

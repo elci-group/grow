@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Approval gate on `grow run` and `grow serve` for installed apps: the
   verified HEAD commit and install-time approval record are checked before
   execution, with plain re-verify and reinstall errors
+- `grow install` from `https://` remotes on github.com and gitlab.com:
+  host allowlist, credential-URL rejection, shallow clone via the host
+  `git` binary
+- `grow daemon`: `grow://` resolver control plane (default port 7890) for
+  the browser extension — `/resolve` installs and serves apps on first use,
+  plus `/apps`, `/healthz`, and a status page
+- Chrome extension (MV3) in `extension/`: omnibox keyword `grow`, `grow://`
+  link interception, and a resolver popup
+- Registry metadata records the install source, letting the daemon map
+  `grow://` URLs back to installed apps
 
 ### Changed
 - Synced workspace version with `VERSION` file (0.1.20)

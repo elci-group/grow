@@ -20,7 +20,9 @@ pub enum GitError {
     Bare,
     #[error("cannot resolve HEAD commit: {0}")]
     Head(String),
-    #[error("remote URL scheme is not supported (use a local path, a file:// URL, or an https:// URL from github.com or gitlab.com): {0}")]
+    #[error(
+        "remote URL scheme is not supported (use a local path, a file:// URL, or an https:// URL from github.com or gitlab.com): {0}"
+    )]
     UnsupportedScheme(String),
     #[error("remote host is not supported (use github.com or gitlab.com): {0}")]
     UnsupportedHost(String),
@@ -155,7 +157,12 @@ impl Repository {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(GitError::Clone {
                 url: source.to_string(),
-                reason: stderr.trim().lines().last().unwrap_or("git clone failed").to_string(),
+                reason: stderr
+                    .trim()
+                    .lines()
+                    .last()
+                    .unwrap_or("git clone failed")
+                    .to_string(),
             });
         }
         Self::open(dest)

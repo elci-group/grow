@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::{Query, Request, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
@@ -21,7 +21,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use tokio::net::TcpListener;
 
-use crate::{enforce_install_policy, install_into, installed_apps_in, resolve_in, InstalledApp};
+use crate::{InstalledApp, enforce_install_policy, install_into, installed_apps_in, resolve_in};
 
 /// Default localhost port for the control plane.
 pub const DEFAULT_PORT: u16 = 7890;
@@ -201,10 +201,7 @@ fn parse_grow_url(url: &str) -> Result<GrowTarget, String> {
 
 /// Resolve a grow:// URL to a running app server, installing and starting
 /// the app when needed.
-async fn resolve_grow_url(
-    state: &DaemonState,
-    url: &str,
-) -> Result<serde_json::Value, String> {
+async fn resolve_grow_url(state: &DaemonState, url: &str) -> Result<serde_json::Value, String> {
     let target = parse_grow_url(url)?;
     let source = target.clone_source();
 
@@ -249,12 +246,20 @@ async fn ensure_served(state: &DaemonState, app: &InstalledApp) -> Result<u16, S
 
     let resolved = resolve_in(&state.root, &app.name).map_err(|e| e.to_string())?;
     let repo = grow_git::Repository::open(&resolved.repo_path).map_err(|e| e.to_string())?;
-    let storage = enforce_install_policy(&state.root, &resolved, &repo).map_err(|e| e.to_string())?;
-    let app_state = grow_server::load_with_storage(&resolved.repo_path, storage)
-        .map_err(|e| e.to_string())?;
+    let storage =
+        enforce_install_policy(&state.root, &resolved, &repo).map_err(|e| e.to_string())?;
+    let app_state =
+        grow_server::load_with_storage(&resolved.repo_path, storage).map_err(|e| e.to_string())?;
     let router = grow_server::app(app_state);
 
-    let mut port = *state.served.lock().unwrap().values().max().unwrap_or(&(FIRST_APP_PORT - 1)) + 1;
+    let mut port = *state
+        .served
+        .lock()
+        .unwrap()
+        .values()
+        .max()
+        .unwrap_or(&(FIRST_APP_PORT - 1))
+        + 1;
     let listener = loop {
         match TcpListener::bind(std::net::SocketAddr::from(([127, 0, 0, 1], port))).await {
             Ok(listener) => break listener,
@@ -263,8 +268,7 @@ async fn ensure_served(state: &DaemonState, app: &InstalledApp) -> Result<u16, S
         }
     };
     tokio::spawn(async move {
-        let make_service =
-            router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+        let make_service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
         if let Err(e) = axum::serve(listener, make_service).await {
             tracing::warn!("app server stopped: {e}");
         }
