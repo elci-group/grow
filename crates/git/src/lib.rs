@@ -20,8 +20,12 @@ pub enum GitError {
     Bare,
     #[error("cannot resolve HEAD commit: {0}")]
     Head(String),
-    #[error("remote URL scheme is not supported (use a local path or file:// URL): {0}")]
+    #[error("remote URL scheme is not supported (use a local path, a file:// URL, or an https:// URL from github.com or gitlab.com): {0}")]
     UnsupportedScheme(String),
+    #[error("remote host is not supported (use github.com or gitlab.com): {0}")]
+    UnsupportedHost(String),
+    #[error("credential-bearing remote URLs are not supported: {0}")]
+    CredentialsInUrl(String),
     #[error("cannot clone {url}: {reason}")]
     Clone { url: String, reason: String },
     #[error("missing {MANIFEST_PATH} at repository root {0}")]
@@ -89,18 +93,21 @@ impl Repository {
     /// Clone the repository at `source` into `dest`, then verify HEAD and
     /// load the manifest exactly like [`Repository::open()`].
     ///
-    /// `source` is a local path or a `file://` URL — any remote URL scheme
-    /// is rejected with [`GitError::UnsupportedScheme`], as network remotes
-    /// are out of scope. `dest` must not exist yet or be an empty directory.
-    /// The clone is a normal (non-bare) repository with the source `HEAD`
-    /// branch checked out into the working tree.
+    /// `source` is a local path, a `file://` URL, or an `https://` URL whose
+    /// host is `github.com` or `gitlab.com` (the hosts the `grow://` browser
+    /// flow supports); any other scheme or host is rejected, as are URLs
+    /// carrying credentials. `dest` must not exist yet or be an empty
+    /// directory. The clone is a normal (non-bare) repository with the
+    /// source `HEAD` branch checked out into the working tree.
     pub fn clone_from(source: &str, dest: &Path) -> Result<Self, GitError> {
         let url = gix::url::parse(source.as_ref()).map_err(|e| GitError::Clone {
             url: source.to_string(),
             reason: e.to_string(),
         })?;
-        if url.scheme != gix::url::Scheme::File {
-            return Err(GitError::UnsupportedScheme(source.to_string()));
+        match url.scheme {
+            gix::url::Scheme::File => {}
+            gix::url::Scheme::Https => validate_https_remote(&url)?,
+            _ => return Err(GitError::UnsupportedScheme(source.to_string())),
         }
 
         let mut fetch = gix::prepare_clone(source, dest).map_err(|e| GitError::Clone {
@@ -153,6 +160,30 @@ impl Repository {
     pub fn contains_file(&self, relative: &str) -> bool {
         self.read_file(relative).is_ok()
     }
+}
+
+/// Remote hosts `grow install` and the `grow://` browser flow may clone
+/// from over https. Matching is exact or on subdomains (`www.` included).
+const SUPPORTED_REMOTE_HOSTS: [&str; 2] = ["github.com", "gitlab.com"];
+
+/// Gate for `https://` clone sources: only [`SUPPORTED_REMOTE_HOSTS`], and
+/// never URLs carrying credentials (which would end up in error messages,
+/// logs, and the registry metadata).
+fn validate_https_remote(url: &gix::Url) -> Result<(), GitError> {
+    if url.user.is_some() {
+        return Err(GitError::CredentialsInUrl(url.to_string()));
+    }
+    let host = url.host().unwrap_or_default();
+    let host = host.strip_prefix("www.").unwrap_or(host);
+    let allowed = SUPPORTED_REMOTE_HOSTS
+        .iter()
+        .any(|h| host == *h || host.ends_with(&format!(".{h}")));
+    if !allowed {
+        return Err(GitError::UnsupportedHost(
+            url.host().unwrap_or_default().to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn read_tree_file(

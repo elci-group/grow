@@ -17,8 +17,8 @@ d = 0.20
 r = 0.15
 
 [version_thresholds]
-minor = 0.6    # score at or above this bumps Minor
-patch = 0.1    # score at or above this bumps Patch; below it, no commit
+minor = 99.0   # demo: version pinned — bumps paused (see docs/demo-roadmap.md)
+patch = 99.0   # score at or above this bumps Patch; below it, no commit
 
 [push]
 enabled = false

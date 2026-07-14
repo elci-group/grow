@@ -1,5 +1,13 @@
 # GROW MVP Demo Roadmap
 
+> **Status: executed 2026-07-14.** All phases D0–D4 complete. Sites live on
+> ports 7870/7871/7872; four kaptaind daemons healthy (grow on 3056, demo
+> repos on 3057–3059). Findings: kaptaind's version writeback patches only
+> `[package].version`, so virtual-workspace repos (grow) drift on every bump
+> — grow's thresholds are pinned at 99.0 for the demo; demo repos needed a
+> `VERSION` file before the daemon would commit, and their bump threshold
+> was lowered to 0.02 for content-scale edits.
+
 This roadmap defines the path to a presentable MVP demo: a working set of
 high-quality sites hosted entirely on git repositories, installed and served
 by `grow`, with `kaptaind` monitoring both GROW itself and every demo site.
