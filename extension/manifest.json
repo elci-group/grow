@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "grow",
+  "version": "0.2.2",
+  "description": "Navigate grow:// URLs — sites hosted on git repositories (GitHub, GitLab), served locally by the grow runtime.",
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Open a grow:// URL"
+  },
+  "omnibox": { "keyword": "grow" },
+  "host_permissions": ["http://127.0.0.1:7890/*"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

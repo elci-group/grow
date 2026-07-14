@@ -93,10 +93,16 @@ async fn index(State(state): State<DaemonState>) -> Html<String> {
     Html(format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>grow daemon</title>\
          <style>body{{font-family:ui-monospace,monospace;margin:2rem;background:#0d1411;color:#e9f2ed}}\
-         a{{color:#5cb584}}</style></head><body>\
+         a{{color:#5cb584}}#error{{display:none;background:#3d1a1a;border:1px solid #7a3030;\
+         padding:.8rem 1rem;border-radius:8px;margin:1rem 0;color:#f0b8b8}}</style></head><body>\
          <h1>grow:// resolver</h1>\
+         <div id=\"error\"></div>\
          <p>Resolve: <code>/resolve?u=grow://github.com/&lt;owner&gt;/&lt;repo&gt;</code></p>\
          <h2>served apps</h2><ul>{rows}</ul>\
+         <script>const p=new URLSearchParams(location.hash.slice(1));\
+         const e=p.get('error');if(e){{const d=document.getElementById('error');\
+         d.style.display='block';\
+         d.textContent='Could not resolve '+(p.get('u')||'')+': '+e;}}</script>\
          </body></html>"
     ))
 }
