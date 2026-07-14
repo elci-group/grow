@@ -55,8 +55,10 @@ The MVP keeps the current WASM contract:
 - `stdin` receives `METHOD PATH`, headers, a blank line, then the request body.
 - `stdout` returns `STATUS REASON`, headers, a blank line, then the response
   body.
-- Modules receive no filesystem, network, environment, or arguments unless a
-  future capability explicitly grants them.
+- Modules receive no filesystem, network, environment, or arguments by
+  default. Installed apps receive a private storage directory preopened at
+  the module's filesystem root (see Storage Contract); every other
+  capability remains future work.
 
 ## Capability Contract
 
@@ -70,7 +72,11 @@ For any capability to be usable:
 4. Runtime checks the approval record before granting access.
 5. The decision is tied to app identity and verified Git state.
 
-MVP should implement the approval record before enabling risky host powers.
+The MVP implements steps 1–5: `grow install` records explicit approval, and
+`grow run`/`grow serve` re-verify the installed app's HEAD commit and
+approval record before executing it. Approved host powers are recorded but
+not yet granted to modules; the approval record and runtime gate must exist
+before any risky host power is enabled.
 
 ## Storage Contract
 

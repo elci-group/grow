@@ -36,12 +36,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MSRV policy documentation (Rust 1.85+)
 - Request timeout and circuit breaker patterns (5s wall-clock + fuel metering)
 - Cross-platform build support documentation (Linux, macOS, Windows)
+- Storage quota byte parsing (`parse_quota_bytes`, `Manifest::quota_bytes`)
+  with per-invocation enforcement in the WASM runtime
+- `grow install` from `file://` URLs and non-existent local paths: the source
+  is cloned into the registry cache (`<registry>/cache/<name>/`) and deleted
+  by `grow remove`
+- Per-app storage grants: an installed app's private `storage/` directory is
+  preopened as the module's filesystem root `/` with the manifest quota
+  enforced around every invocation
+- Approval gate on `grow run` and `grow serve` for installed apps: the
+  verified HEAD commit and install-time approval record are checked before
+  execution, with plain re-verify and reinstall errors
 
 ### Changed
 - Synced workspace version with `VERSION` file (0.1.20)
 - Improved `grow inspect` output with structured formatting and permission details
 - Enhanced error messages with context (repository paths, file names)
 - Updated server to use `tokio` with `signal` feature for graceful shutdown
+- Path-based `grow run`/`grow serve` is now explicit dev mode: no approval
+  check and no storage grant
 
 ### Security
 - Hardened WASM sandbox with restricted feature flags
@@ -49,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input validation for request headers, body, and paths
 - Output limits on captured stdout/stderr (16MB)
 - Concurrent invocation limits (32 max)
+- App names of only dots (`.`, `..`) are rejected, closing a registry
+  path-traversal hole in install/remove
 
 ## [0.1.3] - 2025-01-13
 

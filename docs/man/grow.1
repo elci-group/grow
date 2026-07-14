@@ -1,4 +1,4 @@
-.TH GROW 1 "2026-07-13" "GROW 0.1.2" "User Commands"
+.TH GROW 1 "2026-07-14" "GROW 0.1.21" "User Commands"
 .SH NAME
 grow \- Git Repository Oriented Web runtime command-line interface
 .SH SYNOPSIS
@@ -7,21 +7,60 @@ grow \- Git Repository Oriented Web runtime command-line interface
 .RI [ options ]
 .SH DESCRIPTION
 .B grow
-loads a committed GROW application from a local Git repository. Manifest,
+loads a committed GROW application from a Git repository. Manifest,
 static assets, and WebAssembly entry modules are read from the verified HEAD
-tree, not from uncommitted working-tree files.
+tree, not from uncommitted working-tree files. Commands accept a repository
+path or the name of an installed app.
 .SH COMMANDS
 .TP
-.B inspect \fIREPO\fR
-Print the application name, manifest version, verified commit ID, and runtime
-entry configuration.
+.B inspect \fIREPO-OR-APP\fR
+Print the application name, manifest version, verified commit ID, runtime
+entry configuration, requested permissions, and storage quota.
 .TP
-.B run \fIREPO\fR
+.B run \fIREPO-OR-APP\fR
 Execute the WebAssembly runtime once with a GET request for / and print its
-CGI-style response.
+CGI-style response. For an installed app the install-time approval record is
+enforced and the app's private storage directory is preopened as the
+module's filesystem root with its quota enforced. A plain repository path
+runs in dev mode: no approval check and no storage grant.
 .TP
-.B serve [--port \fIPORT\fR] \fIREPO\fR
-Run the local HTTP daemon on 127.0.0.1. The default port is 7870.
+.B serve [--port \fIPORT\fR] \fIREPO-OR-APP\fR
+Run the local HTTP daemon on 127.0.0.1. The default port is 7870. Approval
+and storage handling match
+.BR run .
+.TP
+.B install [--approve-capabilities] \fIREPO\fR
+Register an app in the local registry: verified commit, manifest identity,
+source path, requested capabilities, and an approval record.
+.I REPO
+is a local repository path or a
+.BR file://
+URL; other URL schemes are rejected. Cloned sources are kept in the registry
+cache until the app is removed. Cloning spawns
+.BR git-upload-pack ,
+so a
+.B git
+binary must be available on the host. Apps declaring host capabilities
+(network, camera, microphone, clipboard, notifications, or full filesystem)
+require
+.BR --approve-capabilities .
+.TP
+.B list
+List installed apps with version, short commit, and source path.
+.TP
+.B remove \fIAPP\fR
+Remove an installed app's registry metadata and storage, plus the cached
+clone when the app was installed from a clone source. External source
+repositories are never touched.
+.SH APPROVAL
+Before every run or serve of an installed app, the verified HEAD commit and
+the install-time approval record are checked. If the repository moved since
+install,
+.B grow
+fails with "run grow install again to re-verify"; if the app declares host
+capabilities that were not approved, it fails with "reinstall with
+--approve-capabilities". Approved capabilities are recorded but not yet
+granted to modules.
 .SH OPTIONS
 .TP
 .B -h, --help
@@ -33,6 +72,14 @@ Print the GROW CLI version.
 .TP
 .I .grow/manifest.toml
 Application manifest read from the committed repository tree.
+.TP
+.I $GROW_HOME/apps/<name>/
+Per-app registry directory holding metadata.toml and the private storage/
+directory granted to the module. The registry root defaults to
+$XDG_DATA_HOME/grow or ~/.local/share/grow when GROW_HOME is unset.
+.TP
+.I $GROW_HOME/cache/<name>/
+Cached clone for an app installed from a clone source.
 .SH EXIT STATUS
-Non-zero on invalid repositories, manifests, runtime failures, or server
-startup errors.
+Non-zero on invalid repositories, manifests, runtime failures, approval
+refusals, quota errors, or server startup errors.

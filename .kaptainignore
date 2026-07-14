@@ -10,3 +10,6 @@
 
 # Rust
 target
+
+# Demo site repositories (each monitored by its own kaptaind daemon)
+demos

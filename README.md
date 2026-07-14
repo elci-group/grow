@@ -19,15 +19,15 @@ instead of being deployed to a server.
                       +---------------+     +---------------+
 ```
 
-## Status: Milestone 1 — Core Runtime (SOTA-Enhanced)
+## Status: Milestone 2 — Local Registry & Storage (MVP track)
 
 | Crate | Role | Tests |
 |---|---|---|
-| `crates/core` | `.grow/manifest.toml` schema, parsing, validation | 17 |
-| `crates/git` | Repository loading via gix (pure-Rust git), HEAD verification | 11 |
-| `crates/runtime` | wasmtime + WASI preview1, CGI-style invocation, fuel-metered sandbox | 4 |
-| `crates/server` | `grow-server` daemon: static assets + WASM request handling + health/metrics | 1 e2e |
-| `crates/cli` | `grow run` / `grow serve` / `grow inspect` | — |
+| `crates/core` | `.grow/manifest.toml` schema, parsing, validation | 25 |
+| `crates/git` | Repository loading via gix (pure-Rust git), HEAD verification | 15 |
+| `crates/runtime` | wasmtime + WASI preview1, CGI-style invocation, fuel-metered sandbox, storage grants | 10 |
+| `crates/server` | `grow-server` daemon: static assets + WASM request handling + health/metrics | 13 + 1 e2e |
+| `crates/cli` | `grow run` / `grow serve` / `grow inspect` / `grow install` / `grow list` / `grow remove` | 10 |
 
 **Security enhancements**: Path traversal protection, restricted WASM features
 (memory64, multi-memory, threads disabled), request body/header limits,
@@ -76,8 +76,10 @@ fresh instance, CGI-style:
 - **stdin**: `METHOD PATH\n`, then `Header: value\n` lines, a blank line, then the body
 - **stdout**: `STATUS REASON\n` (e.g. `200 OK`), then headers, a blank line, then the body
 
-Modules receive stdio only — no filesystem, network, environment, or
-arguments. Execution is bounded by:
+Modules receive stdio only by default — no filesystem, network, environment,
+or arguments. Installed apps additionally receive a private storage directory
+preopened at the module's filesystem root (see *Local app registry*).
+Execution is bounded by:
 
 - **Fuel metering**: ~1B instructions per invocation (deterministic)
 - **Memory cap**: 256 MB linear memory per instance
@@ -87,6 +89,37 @@ arguments. Execution is bounded by:
 - **Request body limit**: 1 MB max body size
 - **Header limits**: 64 headers max, 256B name, 8KB value
 - **WASM feature restrictions**: memory64, multi-memory, threads disabled
+
+## Local app registry
+
+`grow install <repo>` registers an app in the local registry (`$GROW_HOME`,
+else `$XDG_DATA_HOME/grow`, else `~/.local/share/grow`), recording the
+verified commit, manifest identity, requested capabilities, and an approval
+record. The source is a local repository path or a `file://` URL; other URL
+schemes are rejected. Cloned sources are kept at `<registry>/cache/<name>/`
+and deleted by `grow remove <name>` — external source repositories are never
+touched. Cloning uses gix's file transport, which spawns `git-upload-pack`,
+so a `git` binary must be available on the host.
+
+Apps declaring host capabilities (`network`, `camera`, `microphone`,
+`clipboard`, `notifications`, or `filesystem = "full"`) must be installed
+with `--approve-capabilities`. `grow run` and `grow serve` enforce the
+install-time approval record for installed apps:
+
+- HEAD moved since install:
+  `app '<name>' has changed since install (was <commit>, now <commit>); run grow install again to re-verify`
+- Host powers declared but not approved:
+  `app '<name>' declares host capabilities that are not approved; reinstall with --approve-capabilities`
+
+Each installed app gets a private storage directory at
+`<registry>/apps/<name>/storage/`, preopened as the module's filesystem root
+(`/`) with read/write access. The manifest's `storage.quota` is enforced
+around every invocation; writes over quota fail with a clear quota error.
+Approved host powers are only recorded — modules receive no host capabilities
+beyond this storage directory yet.
+
+Running or serving a plain repository path is dev mode: no approval check and
+no storage grant (the module receives stdio only).
 
 ## Server endpoints
 
@@ -161,6 +194,13 @@ curl http://127.0.0.1:7870/api/hello   # handled by the WASM module
 
 # One-shot execution
 cargo run -p grow-cli -- run /tmp/hello-demo
+
+# Registry flow: install once, then run/serve by name with the approval
+# record and storage grant enforced
+cargo run -p grow-cli -- install /tmp/hello-demo
+cargo run -p grow-cli -- list
+cargo run -p grow-cli -- serve hello-app
+cargo run -p grow-cli -- remove hello-app
 ```
 
 ## License

@@ -1,4 +1,5 @@
 /target
+/demos
 /examples/hello-app/main.wasm
 /.kaptaind
 /.amber

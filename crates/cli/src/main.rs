@@ -91,7 +91,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    match Cli::parse().command {
+    // Print errors in plain Display form; `main`'s Result return would use
+    // the noisier Debug representation.
+    if let Err(err) = dispatch(Cli::parse().command) {
+        eprintln!("error: {err}");
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn dispatch(command: Command) -> Result<(), Box<dyn std::error::Error>> {
+    match command {
         Command::Inspect { app } => inspect(&resolve_app(&app)?.repo_path)?,
         // WASM invocation must not run on a tokio worker thread: WASI stdio
         // pipes block the current thread internally.
@@ -617,7 +627,11 @@ quota = "1mb"
         git(dir.path(), &["init", "-b", "main"]);
         fs::create_dir_all(dir.path().join(".grow")).unwrap();
         fs::write(dir.path().join(".grow/manifest.toml"), manifest).unwrap();
-        fs::write(dir.path().join("main.wasm"), wat::parse_str(ECHO_WAT).unwrap()).unwrap();
+        fs::write(
+            dir.path().join("main.wasm"),
+            wat::parse_str(ECHO_WAT).unwrap(),
+        )
+        .unwrap();
         git(dir.path(), &["add", "-A"]);
         git(
             dir.path(),
@@ -723,7 +737,8 @@ quota = "1mb"
 
         let err = install_into(root.path(), repo.path().to_str().unwrap(), false).unwrap_err();
         assert!(
-            err.to_string().contains("rerun with --approve-capabilities"),
+            err.to_string()
+                .contains("rerun with --approve-capabilities"),
             "got: {err}"
         );
 
@@ -796,7 +811,8 @@ quota = "1mb"
         let root = tempfile::tempdir().unwrap();
         let err = install_into(root.path(), "https://example.com/repo.git", false).unwrap_err();
         assert!(
-            err.to_string().contains("remote URL scheme is not supported"),
+            err.to_string()
+                .contains("remote URL scheme is not supported"),
             "got: {err}"
         );
     }
@@ -812,7 +828,11 @@ quota = "1mb"
         run_once(root.path(), &resolved).expect("run from cached clone");
 
         let app = resolved.installed.as_ref().expect("installed app");
-        let cache = root.path().canonicalize().unwrap().join("cache/fixture-app");
+        let cache = root
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("cache/fixture-app");
         assert_eq!(app.repo_path, cache);
         assert!(cache.join(".grow/manifest.toml").is_file());
 
