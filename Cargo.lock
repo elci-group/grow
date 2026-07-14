@@ -1975,12 +1975,14 @@ dependencies = [
 name = "grow-cli"
 version = "0.2.2"
 dependencies = [
+ "axum",
  "clap",
  "grow-core",
  "grow-git",
  "grow-runtime",
  "grow-server",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "toml 1.1.2+spec-1.1.0",

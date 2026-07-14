@@ -11,6 +11,8 @@ use grow_git::Repository;
 use grow_runtime::{Request, Runtime, StorageGrant};
 use serde::{Deserialize, Serialize};
 
+mod daemon;
+
 #[derive(Parser)]
 #[command(
     name = "grow",
@@ -82,6 +84,18 @@ enum Command {
         /// Installed app name
         app: String,
     },
+    /// Start the grow:// resolver daemon for the browser extension
+    ///
+    /// Runs a small control plane on localhost that the Chrome extension
+    /// queries to resolve grow://<host>/<owner>/<repo> URLs: the app is
+    /// installed from the remote on first use (github.com and gitlab.com
+    /// over https), served on a per-app localhost port, and the extension
+    /// is redirected to it.
+    Daemon {
+        /// Localhost port for the control plane (default: 7890)
+        #[arg(short, long, default_value_t = daemon::DEFAULT_PORT)]
+        port: u16,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,6 +141,7 @@ fn dispatch(command: Command) -> Result<(), Box<dyn std::error::Error>> {
         } => install(&repo, approve_capabilities)?,
         Command::List => list_installed()?,
         Command::Remove { app } => remove_installed(&app)?,
+        Command::Daemon { port } => daemon::run(&registry_root()?, port)?,
     }
     Ok(())
 }
@@ -141,6 +156,11 @@ struct InstalledApp {
     storage_quota: Option<String>,
     approval: ApprovalRecord,
     requested: RequestedCapabilities,
+    /// Original install source (path, file:// URL, or https:// remote), used
+    /// by the daemon to map `grow://` URLs back to installed apps. Absent in
+    /// metadata written before this field existed.
+    #[serde(default)]
+    source: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -318,6 +338,7 @@ fn install_into(
         storage_quota: manifest.storage.quota.clone(),
         approval,
         requested,
+        source: Some(source.to_string()),
     };
 
     let text = toml::to_string_pretty(&installed)?;
@@ -809,10 +830,16 @@ quota = "1mb"
     #[test]
     fn unsupported_remote_scheme_is_rejected() {
         let root = tempfile::tempdir().unwrap();
-        let err = install_into(root.path(), "https://example.com/repo.git", false).unwrap_err();
+        let err = install_into(root.path(), "ssh://example.com/repo.git", false).unwrap_err();
         assert!(
             err.to_string()
                 .contains("remote URL scheme is not supported"),
+            "got: {err}"
+        );
+
+        let err = install_into(root.path(), "https://example.com/repo.git", false).unwrap_err();
+        assert!(
+            err.to_string().contains("remote host is not supported"),
             "got: {err}"
         );
     }

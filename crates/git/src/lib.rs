@@ -321,10 +321,41 @@ entry = "main.wasm"
     #[test]
     fn remote_url_scheme_is_rejected() {
         let dest = tempfile::tempdir().unwrap();
+        let err = Repository::clone_from("ssh://example.com/repo.git", &dest.path().join("clone"))
+            .unwrap_err();
+        assert!(matches!(err, GitError::UnsupportedScheme(_)));
+    }
+
+    #[test]
+    fn https_host_outside_allowlist_is_rejected() {
+        let dest = tempfile::tempdir().unwrap();
         let err =
             Repository::clone_from("https://example.com/repo.git", &dest.path().join("clone"))
                 .unwrap_err();
-        assert!(matches!(err, GitError::UnsupportedScheme(_)));
+        assert!(matches!(err, GitError::UnsupportedHost(_)));
+    }
+
+    #[test]
+    fn https_host_allowlist_accepts_github_and_gitlab() {
+        for source in [
+            "https://github.com/owner/repo.git",
+            "https://www.github.com/owner/repo",
+            "https://gitlab.com/group/subgroup/repo.git",
+        ] {
+            let url = gix::url::parse(source.as_ref()).unwrap();
+            assert!(validate_https_remote(&url).is_ok(), "{source}");
+        }
+    }
+
+    #[test]
+    fn https_url_with_credentials_is_rejected() {
+        let dest = tempfile::tempdir().unwrap();
+        let err = Repository::clone_from(
+            "https://user:token@github.com/owner/repo.git",
+            &dest.path().join("clone"),
+        )
+        .unwrap_err();
+        assert!(matches!(err, GitError::CredentialsInUrl(_)));
     }
 
     #[test]
