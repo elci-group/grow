@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - SOTA development roadmap implementation across 30 domains
+- MVP contract defining supported scope, excluded scope, capability rules,
+  storage rules, CLI surface, failure messages, test matrix, and release gate
+- Version alignment check for `VERSION` and workspace package metadata
 - 17 unit tests for `grow-core` manifest parsing and validation
 - 11 unit tests for `grow-git` repository loading and HEAD verification
 - 4 unit tests for `grow-runtime` WASM sandbox execution
@@ -31,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform build support documentation (Linux, macOS, Windows)
 
 ### Changed
-- Synced workspace version with `VERSION` file (0.1.17)
+- Synced workspace version with `VERSION` file (0.1.18)
 - Improved `grow inspect` output with structured formatting and permission details
 - Enhanced error messages with context (repository paths, file names)
 - Updated server to use `tokio` with `signal` feature for graceful shutdown

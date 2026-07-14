@@ -131,6 +131,10 @@ The executable SOTA roadmap lives in [docs/roadmap.md](docs/roadmap.md). It
 tracks 30 development domains, phase gates, immediate backlog, and current
 non-SOTA gaps.
 
+The MVP contract lives in [docs/mvp.md](docs/mvp.md). It defines the first
+release bar: local install/run/serve/remove, durable approvals, enforced
+storage quota, useful diagnostics, and repeatable release gates.
+
 ## CI/CD
 
 GitHub Actions workflow runs the full quality audit on every push and pull

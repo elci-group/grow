@@ -12,8 +12,25 @@ required = true
 require_regex = ["Thirty Domains", "Immediate Execution Backlog", "Current Non-SOTA Gaps"]
 
 [[file]]
+path = "docs/mvp.md"
+required = true
+require_regex = ["MVP Goal", "Capability Contract", "MVP Test Matrix", "Release Gate"]
+
+[[file]]
+path = "scripts/check-version.sh"
+required = true
+require_regex = ["versions aligned", "version mismatch"]
+
+[[file]]
 path = "scripts/quality-audit.sh"
 required = true
+
+[[command]]
+name = "version alignment"
+cmd = ["bash", "scripts/check-version.sh"]
+expect_exit = 0
+timeout_secs = 120
+stdout_contains = ["versions aligned"]
 
 [[command]]
 name = "workspace format"
@@ -36,6 +53,6 @@ timeout_secs = 300
 
 [[command]]
 name = "dependency policy"
-cmd = ["cargo", "deny", "check"]
+cmd = ["cargo", "deny", "check", "--hide-inclusion-graph"]
 expect_exit = 0
 timeout_secs = 300
