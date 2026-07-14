@@ -96,20 +96,29 @@ impl Repository {
     /// `source` is a local path, a `file://` URL, or an `https://` URL whose
     /// host is `github.com` or `gitlab.com` (the hosts the `grow://` browser
     /// flow supports); any other scheme or host is rejected, as are URLs
-    /// carrying credentials. `dest` must not exist yet or be an empty
-    /// directory. The clone is a normal (non-bare) repository with the
-    /// source `HEAD` branch checked out into the working tree.
+    /// carrying credentials. Local and `file://` sources clone through gix's
+    /// file transport; `https://` remotes clone through the host's `git`
+    /// binary (a shallow `--depth 1` clone, since only the verified HEAD
+    /// tree is served). `dest` must not exist yet or be an empty directory.
+    /// The clone is a normal (non-bare) repository with the source `HEAD`
+    /// branch checked out into the working tree.
     pub fn clone_from(source: &str, dest: &Path) -> Result<Self, GitError> {
         let url = gix::url::parse(source.as_ref()).map_err(|e| GitError::Clone {
             url: source.to_string(),
             reason: e.to_string(),
         })?;
         match url.scheme {
-            gix::url::Scheme::File => {}
-            gix::url::Scheme::Https => validate_https_remote(&url)?,
-            _ => return Err(GitError::UnsupportedScheme(source.to_string())),
+            gix::url::Scheme::File => Self::clone_local(source, dest),
+            gix::url::Scheme::Https => {
+                validate_https_remote(&url)?;
+                Self::clone_https(source, dest)
+            }
+            _ => Err(GitError::UnsupportedScheme(source.to_string())),
         }
+    }
 
+    /// Clone a local path or `file://` URL via gix's file transport.
+    fn clone_local(source: &str, dest: &Path) -> Result<Self, GitError> {
         let mut fetch = gix::prepare_clone(source, dest).map_err(|e| GitError::Clone {
             url: source.to_string(),
             reason: e.to_string(),
@@ -127,6 +136,28 @@ impl Repository {
                 reason: e.to_string(),
             })?;
 
+        Self::open(dest)
+    }
+
+    /// Clone an allowlisted `https://` remote via the host's `git` binary.
+    /// Shallow: the daemon re-clones from scratch on reinstall, and only the
+    /// verified HEAD tree is ever read.
+    fn clone_https(source: &str, dest: &Path) -> Result<Self, GitError> {
+        let output = std::process::Command::new("git")
+            .args(["clone", "--quiet", "--depth", "1", source])
+            .arg(dest)
+            .output()
+            .map_err(|e| GitError::Clone {
+                url: source.to_string(),
+                reason: format!("cannot run git: {e}"),
+            })?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(GitError::Clone {
+                url: source.to_string(),
+                reason: stderr.trim().lines().last().unwrap_or("git clone failed").to_string(),
+            });
+        }
         Self::open(dest)
     }
 
