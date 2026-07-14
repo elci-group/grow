@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>grow://</title>
+<style>
+  body {
+    width: 320px; margin: 0; padding: 16px;
+    background: #0d1411; color: #e9f2ed;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px;
+  }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  h1 span { color: #5cb584; }
+  #status { font-size: 12px; margin: 0 0 10px; color: #93a89b; }
+  #status.ok::before { content: "● "; color: #5cb584; }
+  #status.down::before { content: "● "; color: #d06a6a; }
+  form { display: flex; gap: 6px; }
+  input {
+    flex: 1; padding: 7px 9px; border-radius: 8px; border: 1px solid #243329;
+    background: #131c18; color: #e9f2ed; font-family: ui-monospace, monospace; font-size: 12px;
+  }
+  button {
+    padding: 7px 12px; border-radius: 8px; border: 0;
+    background: #2f7d4f; color: #fff; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: #37955f; }
+  #error { display: none; margin: 10px 0 0; font-size: 12px; color: #f0b8b8; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #7fa18e; margin: 14px 0 6px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 3px 0; font-size: 12px; }
+  a { color: #5cb584; text-decoration: none; }
+  .hint { font-size: 11px; color: #6c8577; margin: 12px 0 0; }
+  code { font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+  <h1>grow<span>://</span></h1>
+  <p id="status">checking daemon…</p>
+  <form id="open-form">
+    <input id="url" type="text" placeholder="grow://github.com/owner/repo" spellcheck="false" autofocus>
+    <button type="submit">Open</button>
+  </form>
+  <p id="error"></p>
+  <h2>served apps</h2>
+  <ul id="apps"><li><em>none</em></li></ul>
+  <p class="hint">Tip: type <code>grow</code> in the address bar, then a repo
+    like <code>github.com/owner/repo</code>.</p>
+  <script src="popup.js"></script>
+</body>
+</html>
