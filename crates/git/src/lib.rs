@@ -3,10 +3,12 @@
 //! Uses `gix` (pure-Rust git) — git is never shelled out to at runtime.
 //! Milestone 1 scope: open a local repository, resolve and expose the HEAD
 //! commit (the "verify commit" lifecycle step), and read files from the
-//! verified commit tree with path-traversal protection. Remote fetch, shallow
-//! clones, and object streaming arrive in Milestone 3.
+//! verified commit tree with path-traversal protection. Repositories can
+//! also be cloned, but only from local paths and `file://` URLs — remote
+//! fetch, shallow clones, and object streaming arrive in Milestone 3.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 use grow_core::{MANIFEST_PATH, Manifest, ManifestError};
 
@@ -18,6 +20,10 @@ pub enum GitError {
     Bare,
     #[error("cannot resolve HEAD commit: {0}")]
     Head(String),
+    #[error("remote URL scheme is not supported (use a local path or file:// URL): {0}")]
+    UnsupportedScheme(String),
+    #[error("cannot clone {url}: {reason}")]
+    Clone { url: String, reason: String },
     #[error("missing {MANIFEST_PATH} at repository root {0}")]
     MissingManifest(PathBuf),
     #[error("file {0:?} does not exist in the verified commit")]
@@ -78,6 +84,43 @@ impl Repository {
             tree,
             manifest,
         })
+    }
+
+    /// Clone the repository at `source` into `dest`, then verify HEAD and
+    /// load the manifest exactly like [`Repository::open()`].
+    ///
+    /// `source` is a local path or a `file://` URL — any remote URL scheme
+    /// is rejected with [`GitError::UnsupportedScheme`], as network remotes
+    /// are out of scope. `dest` must not exist yet or be an empty directory.
+    /// The clone is a normal (non-bare) repository with the source `HEAD`
+    /// branch checked out into the working tree.
+    pub fn clone_from(source: &str, dest: &Path) -> Result<Self, GitError> {
+        let url = gix::url::parse(source.as_ref()).map_err(|e| GitError::Clone {
+            url: source.to_string(),
+            reason: e.to_string(),
+        })?;
+        if url.scheme != gix::url::Scheme::File {
+            return Err(GitError::UnsupportedScheme(source.to_string()));
+        }
+
+        let mut fetch = gix::prepare_clone(source, dest).map_err(|e| GitError::Clone {
+            url: source.to_string(),
+            reason: e.to_string(),
+        })?;
+        let (mut checkout, _outcome) = fetch
+            .fetch_then_checkout(gix::progress::Discard, &AtomicBool::new(false))
+            .map_err(|e| GitError::Clone {
+                url: source.to_string(),
+                reason: e.to_string(),
+            })?;
+        checkout
+            .main_worktree(gix::progress::Discard, &AtomicBool::new(false))
+            .map_err(|e| GitError::Clone {
+                url: source.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        Self::open(dest)
     }
 
     /// Canonicalized repository working-tree root, used only to reopen the
@@ -198,6 +241,21 @@ entry = "main.wasm"
         dir
     }
 
+    fn git_head(path: &Path) -> String {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .expect("git runs");
+        assert!(
+            out.status.success(),
+            "git rev-parse HEAD failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
+    }
+
     #[test]
     fn opens_repo_and_loads_manifest() {
         let dir = fixture_repo(true);
@@ -206,6 +264,45 @@ entry = "main.wasm"
         assert_eq!(repo.manifest().wasm_entry(), Some("main.wasm"));
         assert_eq!(repo.head_commit().len(), 40, "sha1 hex length");
         assert!(repo.read_file("hello.txt").unwrap().starts_with(b"hello"));
+    }
+
+    #[test]
+    fn clones_repo_from_local_path() {
+        let src = fixture_repo(true);
+        let dest = tempfile::tempdir().unwrap();
+        let dest = dest.path().join("clone");
+        let repo =
+            Repository::clone_from(src.path().to_str().unwrap(), &dest).expect("repo clones");
+        assert_eq!(repo.manifest().grow.name, "fixture-app");
+        assert_eq!(repo.head_commit(), git_head(src.path()));
+        assert!(repo.read_file("hello.txt").unwrap().starts_with(b"hello"));
+    }
+
+    #[test]
+    fn clones_repo_from_file_url() {
+        let src = fixture_repo(true);
+        let dest = tempfile::tempdir().unwrap();
+        let url = format!("file://{}", src.path().display());
+        let repo = Repository::clone_from(&url, &dest.path().join("clone")).expect("repo clones");
+        assert_eq!(repo.head_commit(), git_head(src.path()));
+    }
+
+    #[test]
+    fn remote_url_scheme_is_rejected() {
+        let dest = tempfile::tempdir().unwrap();
+        let err =
+            Repository::clone_from("https://example.com/repo.git", &dest.path().join("clone"))
+                .unwrap_err();
+        assert!(matches!(err, GitError::UnsupportedScheme(_)));
+    }
+
+    #[test]
+    fn clone_into_non_empty_dir_is_rejected() {
+        let src = fixture_repo(true);
+        let dest = tempfile::tempdir().unwrap();
+        fs::write(dest.path().join("occupied.txt"), "not empty").unwrap();
+        let err = Repository::clone_from(src.path().to_str().unwrap(), dest.path()).unwrap_err();
+        assert!(matches!(err, GitError::Clone { .. }));
     }
 
     #[test]

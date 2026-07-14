@@ -30,7 +30,8 @@ grow remove hello-app
 - `grow run` for one-shot local execution.
 - `grow serve` for localhost HTTP serving.
 - Per-app install metadata stored locally.
-- Durable approval records for requested host capabilities.
+- Durable approval records for requested host capabilities, tied to app name,
+  verified commit, approval time, and declared capabilities.
 - Per-app storage directories with enforced quota.
 - Health and metrics endpoints for the local server.
 - Clear user-facing errors for common failure cases.

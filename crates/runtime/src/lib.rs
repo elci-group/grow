@@ -11,12 +11,16 @@
 //!
 //! * fuel metering bounds execution time deterministically,
 //! * linear memory is capped,
-//! * the module receives stdio only — no filesystem, network, env, or args.
+//! * the module receives stdio only by default — no filesystem, network, env,
+//!   or args; with a [`StorageGrant`], a per-app host directory is preopened as
+//!   the module's filesystem root with a byte quota enforced around each
+//!   invocation.
 
+use std::path::{Path, PathBuf};
 use wasmtime::{Config, Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder, Trap};
 use wasmtime_wasi::p1::{self, WasiP1Ctx};
 use wasmtime_wasi::p2::pipe::{MemoryInputPipe, MemoryOutputPipe};
-use wasmtime_wasi::{I32Exit, WasiCtxBuilder};
+use wasmtime_wasi::{DirPerms, FilePerms, I32Exit, WasiCtxBuilder};
 
 /// Stack size limit per module instance (1 MB, must not exceed async stack size).
 pub const MAX_STACK_BYTES: usize = 1024 * 1024;
@@ -113,6 +117,8 @@ pub enum RuntimeError {
     Trap(String),
     #[error("module produced an invalid response: {0}")]
     BadResponse(String),
+    #[error("storage quota exceeded: using {used} bytes of {quota} byte limit")]
+    StorageQuotaExceeded { used: u64, quota: u64 },
 }
 
 /// Parse a module's stdout into a [`Response`].
@@ -160,6 +166,65 @@ pub fn parse_response(stdout: &[u8]) -> Result<Response, RuntimeError> {
     })
 }
 
+/// Host directory granted to the module as its filesystem root, with an
+/// optional byte quota enforced around each invocation.
+#[derive(Debug, Clone)]
+pub struct StorageGrant {
+    pub dir: PathBuf,
+    pub quota_bytes: Option<u64>,
+}
+
+impl StorageGrant {
+    /// Grant the module `dir` as its filesystem root (`/`), optionally capped
+    /// at `quota_bytes` of total file content.
+    pub fn new(dir: impl Into<PathBuf>, quota_bytes: Option<u64>) -> Self {
+        Self {
+            dir: dir.into(),
+            quota_bytes,
+        }
+    }
+}
+
+/// Recursive sum of file sizes under `dir`. Symlinks are never followed, so
+/// links pointing outside the tree cannot hide or inflate usage. Iterative to
+/// keep host stack usage independent of module-created directory depth.
+fn dir_size_bytes(dir: &Path) -> std::io::Result<u64> {
+    let mut total = 0;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
+                stack.push(entry.path());
+            } else {
+                total += entry.metadata()?.len();
+            }
+        }
+    }
+    Ok(total)
+}
+
+/// Fail with [`RuntimeError::StorageQuotaExceeded`] when the granted directory
+/// already holds more than its declared quota.
+fn enforce_quota(grant: &StorageGrant) -> Result<(), RuntimeError> {
+    if let Some(quota) = grant.quota_bytes {
+        let used = dir_size_bytes(&grant.dir).map_err(|e| {
+            RuntimeError::Engine(format!(
+                "storage error: cannot measure {}: {e}",
+                grant.dir.display()
+            ))
+        })?;
+        if used > quota {
+            return Err(RuntimeError::StorageQuotaExceeded { used, quota });
+        }
+    }
+    Ok(())
+}
+
 /// A compiled GROW application. Cheap to clone-free share: the engine and
 /// module are `Send + Sync`; each invocation builds a fresh `Store`.
 pub struct Runtime {
@@ -189,7 +254,17 @@ impl Runtime {
     /// Invoke the module's `_start` with `stdin` as its standard input and
     /// return captured stdout. Synchronous and CPU-bound — callers in async
     /// contexts should use `spawn_blocking` plus a timeout.
-    pub fn run_raw(&self, stdin: &[u8]) -> Result<Vec<u8>, RuntimeError> {
+    ///
+    /// With `storage`, the granted directory is created if missing, preopened
+    /// as the module's filesystem root (`/`), and its quota is checked before
+    /// and after the run: an over-quota directory fails the request with
+    /// [`RuntimeError::StorageQuotaExceeded`] even when the module ran fine.
+    /// With `None` the module receives stdio only, exactly as before.
+    pub fn run_raw(
+        &self,
+        stdin: &[u8],
+        storage: Option<&StorageGrant>,
+    ) -> Result<Vec<u8>, RuntimeError> {
         let stdout = MemoryOutputPipe::new(MAX_OUTPUT_BYTES);
         let stderr = MemoryOutputPipe::new(MAX_OUTPUT_BYTES);
 
@@ -198,7 +273,25 @@ impl Runtime {
             .stdin(MemoryInputPipe::new(stdin.to_vec()))
             .stdout(stdout.clone())
             .stderr(stderr.clone());
-        // Deliberately no preopened dirs, env, or args: stdio only.
+        // Deliberately no env or args. Without a storage grant, no preopened
+        // dirs either: stdio only.
+        if let Some(grant) = storage {
+            std::fs::create_dir_all(&grant.dir).map_err(|e| {
+                RuntimeError::Engine(format!(
+                    "storage error: cannot create {}: {e}",
+                    grant.dir.display()
+                ))
+            })?;
+            enforce_quota(grant)?;
+            builder
+                .preopened_dir(&grant.dir, "/", DirPerms::all(), FilePerms::all())
+                .map_err(|e| {
+                    RuntimeError::Engine(format!(
+                        "storage error: cannot preopen {}: {e}",
+                        grant.dir.display()
+                    ))
+                })?;
+        }
         let wasi = builder.build_p1();
 
         let mut store = Store::new(
@@ -226,10 +319,18 @@ impl Runtime {
         })();
 
         match result {
-            Ok(()) => Ok(stdout.contents().to_vec()),
+            Ok(()) => {
+                if let Some(grant) = storage {
+                    enforce_quota(grant)?;
+                }
+                Ok(stdout.contents().to_vec())
+            }
             Err(err) => {
                 if let Some(exit) = err.downcast_ref::<I32Exit>() {
                     if exit.0 == 0 {
+                        if let Some(grant) = storage {
+                            enforce_quota(grant)?;
+                        }
                         return Ok(stdout.contents().to_vec());
                     }
                     return Err(RuntimeError::Exit(exit.0));
@@ -242,9 +343,14 @@ impl Runtime {
         }
     }
 
-    /// Invoke the module and parse its stdout as a [`Response`].
-    pub fn invoke(&self, request: &Request) -> Result<Response, RuntimeError> {
-        parse_response(&self.run_raw(&request.frame()?)?)
+    /// Invoke the module and parse its stdout as a [`Response`]. The `storage`
+    /// grant behaves exactly as in [`Runtime::run_raw`].
+    pub fn invoke(
+        &self,
+        request: &Request,
+        storage: Option<&StorageGrant>,
+    ) -> Result<Response, RuntimeError> {
+        parse_response(&self.run_raw(&request.frame()?, storage)?)
     }
 }
 
@@ -284,12 +390,15 @@ mod tests {
     fn echoes_request_line_in_body() {
         let runtime = echo_runtime();
         let response = runtime
-            .invoke(&Request {
-                method: "GET".into(),
-                path: "/hello".into(),
-                headers: vec![("Host".into(), "localhost".into())],
-                body: Vec::new(),
-            })
+            .invoke(
+                &Request {
+                    method: "GET".into(),
+                    path: "/hello".into(),
+                    headers: vec![("Host".into(), "localhost".into())],
+                    body: Vec::new(),
+                },
+                None,
+            )
             .expect("invocation succeeds");
         assert_eq!(response.status, 200);
         assert_eq!(response.reason, "OK");
@@ -312,7 +421,7 @@ mod tests {
         let wasm =
             wat::parse_str(r#"(module (func (export "_start") (loop $l (br $l))))"#).unwrap();
         let runtime = Runtime::new(&wasm).unwrap();
-        let err = runtime.run_raw(&[]).unwrap_err();
+        let err = runtime.run_raw(&[], None).unwrap_err();
         assert!(matches!(err, RuntimeError::OutOfFuel), "got: {err}");
     }
 
@@ -326,7 +435,7 @@ mod tests {
         )
         .unwrap();
         let runtime = Runtime::new(&wasm).unwrap();
-        let err = runtime.run_raw(&[]).unwrap_err();
+        let err = runtime.run_raw(&[], None).unwrap_err();
         assert!(matches!(err, RuntimeError::Exit(3)), "got: {err}");
     }
 
@@ -338,5 +447,149 @@ mod tests {
         let ok = parse_response(b"204 No Content\n\n").unwrap();
         assert_eq!(ok.status, 204);
         assert!(ok.body.is_empty());
+    }
+
+    /// WASI module that writes 16 bytes to `storage-test.txt` under the
+    /// preopened root (fd 3): `path_open` with OFLAG_CREAT, `fd_write`,
+    /// `fd_close`. `path_open` args: dir fd 3, lookupflags 0, path ptr/len,
+    /// oflags 1 (CREAT), rights 66 (FD_READ | FD_WRITE), fdflags 0. A nonzero
+    /// WASI errno aborts `_start` with it as the exit code.
+    ///
+    /// Memory layout: file body at [0, 16), path string at [64, 80), iovec at
+    /// 1024, opened-fd result at 1032, nwritten scratch at 1036.
+    pub const WRITE_WAT: &str = r#"(module
+  (import "wasi_snapshot_preview1" "path_open" (func $path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_close" (func $fd_close (param i32) (result i32)))
+  (import "wasi_snapshot_preview1" "proc_exit" (func $proc_exit (param i32)))
+  (memory (export "memory") 1)
+  (data (i32.const 0) "0123456789abcdef")
+  (data (i32.const 64) "storage-test.txt")
+  (func (export "_start")
+    (local $errno i32)
+    (local.set $errno
+      (call $path_open
+        (i32.const 3)
+        (i32.const 0)
+        (i32.const 64)
+        (i32.const 16)
+        (i32.const 1)
+        (i64.const 66)
+        (i64.const 0)
+        (i32.const 0)
+        (i32.const 1032)))
+    (if (local.get $errno) (then (call $proc_exit (local.get $errno))))
+    (i32.store (i32.const 1024) (i32.const 0))
+    (i32.store (i32.const 1028) (i32.const 16))
+    (local.set $errno
+      (call $fd_write (i32.load (i32.const 1032)) (i32.const 1024) (i32.const 1) (i32.const 1036)))
+    (if (local.get $errno) (then (call $proc_exit (local.get $errno))))
+    (local.set $errno (call $fd_close (i32.load (i32.const 1032))))
+    (if (local.get $errno) (then (call $proc_exit (local.get $errno))))
+    (call $proc_exit (i32.const 0))
+  )
+)"#;
+
+    fn write_runtime() -> Runtime {
+        let wasm = wat::parse_str(WRITE_WAT).expect("WAT compiles");
+        Runtime::new(&wasm).expect("runtime builds")
+    }
+
+    /// Fresh, empty host directory for a storage test, unique per test name
+    /// and process so reruns start clean.
+    fn temp_storage_dir(test: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("grow-runtime-{test}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir created");
+        dir
+    }
+
+    #[test]
+    fn write_under_quota_persists_on_host() {
+        let dir = temp_storage_dir("write-under-quota");
+        let runtime = write_runtime();
+        let grant = StorageGrant::new(&dir, Some(256));
+        runtime
+            .run_raw(&[], Some(&grant))
+            .expect("invocation succeeds");
+        let written = std::fs::read(dir.join("storage-test.txt")).expect("file persists on host");
+        assert_eq!(written, b"0123456789abcdef");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn write_over_quota_fails_after_run() {
+        let dir = temp_storage_dir("write-over-quota");
+        let runtime = write_runtime();
+        let grant = StorageGrant::new(&dir, Some(8));
+        let err = runtime.run_raw(&[], Some(&grant)).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::StorageQuotaExceeded { used: 16, quota: 8 }
+            ),
+            "got: {err}"
+        );
+        // The module did run; the quota check fails the request afterwards.
+        assert!(dir.join("storage-test.txt").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dir_already_over_quota_fails_before_run() {
+        let dir = temp_storage_dir("preexisting-over-quota");
+        std::fs::write(dir.join("pre-existing.bin"), [0u8; 32]).expect("seed file");
+        let runtime = write_runtime();
+        let grant = StorageGrant::new(&dir, Some(16));
+        let err = runtime.run_raw(&[], Some(&grant)).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                RuntimeError::StorageQuotaExceeded {
+                    used: 32,
+                    quota: 16
+                }
+            ),
+            "got: {err}"
+        );
+        // The module must not have run: no new file in the granted dir.
+        assert!(!dir.join("storage-test.txt").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn no_storage_grant_means_no_filesystem() {
+        let runtime = write_runtime();
+        let err = runtime.run_raw(&[], None).unwrap_err();
+        // Without a grant fd 3 is not a preopen: path_open fails and the
+        // module exits nonzero with the WASI errno.
+        assert!(
+            matches!(err, RuntimeError::Exit(code) if code != 0),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn dir_size_counts_nested_files() {
+        let dir = temp_storage_dir("dir-size-nested");
+        std::fs::create_dir_all(dir.join("sub").join("deep")).expect("nested dirs");
+        std::fs::write(dir.join("a.bin"), [0u8; 10]).expect("file a");
+        std::fs::write(dir.join("sub").join("b.bin"), [0u8; 20]).expect("file b");
+        std::fs::write(dir.join("sub").join("deep").join("c.bin"), [0u8; 5]).expect("file c");
+        assert_eq!(dir_size_bytes(&dir).expect("measured"), 35);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dir_size_does_not_follow_symlinks() {
+        let dir = temp_storage_dir("dir-size-symlink");
+        std::fs::write(dir.join("real.bin"), [0u8; 10]).expect("real file");
+        // A link back into the tree and one pointing outside it: neither
+        // counts toward usage.
+        std::os::unix::fs::symlink(dir.join("real.bin"), dir.join("link-in")).expect("symlink");
+        std::os::unix::fs::symlink("/etc/hostname", dir.join("link-out")).expect("symlink");
+        assert_eq!(dir_size_bytes(&dir).expect("measured"), 10);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

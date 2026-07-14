@@ -1115,6 +1115,7 @@ dependencies = [
  "gix-submodule",
  "gix-tempfile",
  "gix-trace",
+ "gix-transport",
  "gix-traverse",
  "gix-url",
  "gix-utils",
@@ -1599,7 +1600,9 @@ dependencies = [
  "gix-hashtable",
  "gix-object",
  "gix-path",
+ "gix-tempfile",
  "memmap2",
+ "parking_lot",
  "smallvec",
  "thiserror 2.0.18",
  "uluru",
@@ -1664,11 +1667,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "978468bae4ea2df20c72db3b20d0bdb548a0c1090b85a83643b553e6e0e041f2"
 dependencies = [
  "bstr",
+ "gix-credentials",
  "gix-date",
  "gix-features",
  "gix-hash",
+ "gix-lock",
+ "gix-negotiate",
+ "gix-object",
  "gix-ref",
+ "gix-refspec",
+ "gix-revwalk",
  "gix-shallow",
+ "gix-trace",
  "gix-transport",
  "gix-utils",
  "maybe-async",
@@ -1963,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "grow-cli"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "clap",
  "grow-core",
@@ -1971,15 +1981,17 @@ dependencies = [
  "grow-runtime",
  "grow-server",
  "serde",
+ "tempfile",
  "tokio",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "wat",
 ]
 
 [[package]]
 name = "grow-core"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
@@ -1988,7 +2000,7 @@ dependencies = [
 
 [[package]]
 name = "grow-git"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "gix",
  "grow-core",
@@ -1998,7 +2010,7 @@ dependencies = [
 
 [[package]]
 name = "grow-runtime"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "criterion",
  "thiserror 2.0.18",
@@ -2009,7 +2021,7 @@ dependencies = [
 
 [[package]]
 name = "grow-server"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "axum",
  "clap",

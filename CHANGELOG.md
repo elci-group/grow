@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version alignment check for `VERSION` and workspace package metadata
 - Local install lifecycle commands: `grow install`, `grow list`, and
   `grow remove`
+- Durable install approval records tied to app identity, verified commit,
+  approval time, and declared capabilities
 - 17 unit tests for `grow-core` manifest parsing and validation
 - 11 unit tests for `grow-git` repository loading and HEAD verification
 - 4 unit tests for `grow-runtime` WASM sandbox execution
@@ -36,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform build support documentation (Linux, macOS, Windows)
 
 ### Changed
-- Synced workspace version with `VERSION` file (0.1.19)
+- Synced workspace version with `VERSION` file (0.1.20)
 - Improved `grow inspect` output with structured formatting and permission details
 - Enhanced error messages with context (repository paths, file names)
 - Updated server to use `tokio` with `signal` feature for graceful shutdown

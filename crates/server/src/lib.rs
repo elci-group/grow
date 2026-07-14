@@ -8,7 +8,12 @@
 //! * `GET` for a path that matches a file in the repository — static asset with
 //!   `Cache-Control: public, max-age=3600, immutable` and `ETag` headers,
 //! * anything else — handed to the WASM entry module (CGI-style over WASI),
-//! * `404` when the repository declares no runtime entry.
+//! * `404` when the repository declares no runtime entry,
+//! * `507` when the module's storage grant exceeds its byte quota.
+//!
+//! An optional [`grow_runtime::StorageGrant`] preopens a per-app host
+//! directory as the module's filesystem root, with its byte quota enforced
+//! around every invocation; without one the module gets stdio only.
 //!
 //! Middleware stack (applied in order, first to last):
 //! 1. CORS — permissive, allows cross-origin requests for local development
@@ -35,7 +40,7 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response as HttpResponse};
 use axum::routing::get;
 use grow_git::{GitError, Repository};
-use grow_runtime::{Request, Runtime};
+use grow_runtime::{Request, Runtime, RuntimeError, StorageGrant};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
@@ -64,6 +69,7 @@ pub enum ServerError {
 pub struct AppState {
     repo: Repository,
     runtime: Option<Arc<Runtime>>,
+    storage: Option<StorageGrant>,
     metrics: RequestMetrics,
     rate_limiter: RateLimiter,
 }
@@ -128,7 +134,21 @@ impl RateLimiter {
 }
 
 /// Open and verify the repository, compiling the WASM entry if declared.
+///
+/// Equivalent to [`load_with_storage`] with no storage grant.
 pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
+    load_with_storage(repo_path, None)
+}
+
+/// Open and verify the repository, compiling the WASM entry if declared.
+///
+/// With `storage`, every WASM invocation preopens the granted directory as
+/// the module's filesystem root and enforces its byte quota; with `None` the
+/// module receives stdio only (see [`grow_runtime::StorageGrant`]).
+pub fn load_with_storage(
+    repo_path: &Path,
+    storage: Option<StorageGrant>,
+) -> Result<Arc<AppState>, ServerError> {
     let repo = Repository::open(repo_path)?;
     let runtime = match repo.manifest().wasm_entry() {
         Some(entry) => {
@@ -140,6 +160,7 @@ pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
     Ok(Arc::new(AppState {
         repo,
         runtime,
+        storage,
         metrics: RequestMetrics::new(),
         rate_limiter: RateLimiter::new(),
     }))
@@ -163,11 +184,14 @@ pub fn app(state: Arc<AppState>) -> Router {
 pub struct ServeConfig {
     pub repo: PathBuf,
     pub port: u16,
+    /// Per-app storage granted to the module's WASI sandbox; `None` for
+    /// stdio-only invocations.
+    pub storage: Option<StorageGrant>,
 }
 
 /// Serve a repository on `127.0.0.1:port` with graceful shutdown.
 pub async fn serve(config: ServeConfig) -> Result<(), ServerError> {
-    let state = load(&config.repo)?;
+    let state = load_with_storage(&config.repo, config.storage)?;
     {
         let manifest = state.repo.manifest();
         tracing::info!(
@@ -321,6 +345,7 @@ async fn handle_request(
     let Some(runtime) = state.runtime.clone() else {
         return status_text(StatusCode::NOT_FOUND, "not found\n");
     };
+    let storage = state.storage.clone();
 
     let request = Request {
         method: method.to_string(),
@@ -339,20 +364,32 @@ async fn handle_request(
 
     match tokio::time::timeout(
         REQUEST_TIMEOUT,
-        tokio::task::spawn_blocking(move || runtime.invoke(&request)),
+        tokio::task::spawn_blocking(move || runtime.invoke(&request, storage.as_ref())),
     )
     .await
     {
         Ok(Ok(Ok(response))) => to_http(response),
         Ok(Ok(Err(err))) => {
             tracing::warn!(%err, "wasm invocation failed");
-            status_text(StatusCode::BAD_GATEWAY, "application error\n")
+            invocation_error_response(&err)
         }
         Ok(Err(err)) => {
             tracing::warn!(%err, "wasm task failed");
             status_text(StatusCode::INTERNAL_SERVER_ERROR, "internal error\n")
         }
         Err(_) => status_text(StatusCode::GATEWAY_TIMEOUT, "application timed out\n"),
+    }
+}
+
+/// Map a failed WASM invocation to its HTTP response: an over-quota storage
+/// grant means the application exhausted its allowance (507), anything else
+/// is a generic application failure (502).
+fn invocation_error_response(err: &RuntimeError) -> HttpResponse {
+    match err {
+        RuntimeError::StorageQuotaExceeded { .. } => {
+            status_text(StatusCode::INSUFFICIENT_STORAGE, "storage quota exceeded\n")
+        }
+        _ => status_text(StatusCode::BAD_GATEWAY, "application error\n"),
     }
 }
 
@@ -542,5 +579,37 @@ mod tests {
         assert_eq!(m.total.load(Ordering::Relaxed), 2);
         assert_eq!(m.errors.load(Ordering::Relaxed), 1);
         assert_eq!(m.total_duration_ms.load(Ordering::Relaxed), 150);
+    }
+
+    #[test]
+    fn invocation_error_maps_quota_exceeded_to_507() {
+        let err = RuntimeError::StorageQuotaExceeded { used: 16, quota: 8 };
+        let resp = invocation_error_response(&err);
+        assert_eq!(resp.status(), StatusCode::INSUFFICIENT_STORAGE);
+    }
+
+    #[tokio::test]
+    async fn invocation_error_quota_body_is_explicit() {
+        let err = RuntimeError::StorageQuotaExceeded { used: 16, quota: 8 };
+        let resp = invocation_error_response(&err);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .expect("body reads");
+        assert_eq!(&body[..], b"storage quota exceeded\n");
+    }
+
+    #[test]
+    fn invocation_error_maps_other_errors_to_502() {
+        let errors = [
+            RuntimeError::Engine("boom".into()),
+            RuntimeError::OutOfFuel,
+            RuntimeError::Exit(1),
+            RuntimeError::Trap("boom".into()),
+            RuntimeError::BadResponse("boom".into()),
+        ];
+        for err in &errors {
+            let resp = invocation_error_response(err);
+            assert_eq!(resp.status(), StatusCode::BAD_GATEWAY, "{err}");
+        }
     }
 }

@@ -31,7 +31,7 @@ fn bench_wasm_invocation(c: &mut Criterion) {
     };
 
     c.bench_function("wasm_invoke_get", |b| {
-        b.iter(|| runtime.invoke(&request).expect("invoke ok"))
+        b.iter(|| runtime.invoke(&request, None).expect("invoke ok"))
     });
 }
 
