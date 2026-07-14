@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform build support documentation (Linux, macOS, Windows)
 
 ### Changed
-- Synced workspace version with `VERSION` file (0.1.3)
+- Synced workspace version with `VERSION` file (0.1.17)
 - Improved `grow inspect` output with structured formatting and permission details
 - Enhanced error messages with context (repository paths, file names)
 - Updated server to use `tokio` with `signal` feature for graceful shutdown

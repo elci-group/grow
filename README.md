@@ -125,6 +125,12 @@ Run the full quality audit (format, clippy, tests, fract, amber, kaptaind):
 scripts/quality-audit.sh
 ```
 
+## Roadmap
+
+The executable SOTA roadmap lives in [docs/roadmap.md](docs/roadmap.md). It
+tracks 30 development domains, phase gates, immediate backlog, and current
+non-SOTA gaps.
+
 ## CI/CD
 
 GitHub Actions workflow runs the full quality audit on every push and pull

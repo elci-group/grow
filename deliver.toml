@@ -7,8 +7,19 @@ path = "README.md"
 required = true
 
 [[file]]
+path = "docs/roadmap.md"
+required = true
+require_regex = ["Thirty Domains", "Immediate Execution Backlog", "Current Non-SOTA Gaps"]
+
+[[file]]
 path = "scripts/quality-audit.sh"
 required = true
+
+[[command]]
+name = "workspace format"
+cmd = ["cargo", "fmt", "--all", "--", "--check"]
+expect_exit = 0
+timeout_secs = 120
 
 [[command]]
 name = "workspace tests"
@@ -20,5 +31,11 @@ stdout_contains = ["test result: ok"]
 [[command]]
 name = "workspace clippy"
 cmd = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+expect_exit = 0
+timeout_secs = 300
+
+[[command]]
+name = "dependency policy"
+cmd = ["cargo", "deny", "check"]
 expect_exit = 0
 timeout_secs = 300

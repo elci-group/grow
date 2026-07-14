@@ -1963,7 +1963,7 @@ dependencies = [
 
 [[package]]
 name = "grow-cli"
-version = "0.1.3"
+version = "0.1.17"
 dependencies = [
  "clap",
  "grow-core",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "grow-core"
-version = "0.1.3"
+version = "0.1.17"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
@@ -1986,7 +1986,7 @@ dependencies = [
 
 [[package]]
 name = "grow-git"
-version = "0.1.3"
+version = "0.1.17"
 dependencies = [
  "gix",
  "grow-core",
@@ -1996,7 +1996,7 @@ dependencies = [
 
 [[package]]
 name = "grow-runtime"
-version = "0.1.3"
+version = "0.1.17"
 dependencies = [
  "criterion",
  "thiserror 2.0.18",
@@ -2007,7 +2007,7 @@ dependencies = [
 
 [[package]]
 name = "grow-server"
-version = "0.1.3"
+version = "0.1.17"
 dependencies = [
  "axum",
  "clap",
