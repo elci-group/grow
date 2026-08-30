@@ -5,3 +5,23 @@
 /.amber
 /amber_proposals
 /amber_report.json
+
+# Grow Browser Mobile (Android)
+/mobile/.gradle
+/mobile/app/build
+/mobile/app/src/main/jniLibs
+
+# generated / noisy
+/.kaptaind/
+/target/
+/node_modules/
+/.venv/
+/venv/
+/__pycache__/
+*.pyc
+*.pyo
+/.cargo/
+*.swp
+*.swo
+.DS_Store
+*.log

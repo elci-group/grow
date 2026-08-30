@@ -6,10 +6,14 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+default = ["wasm"]
+wasm = ["dep:grow-runtime"]
+
 [dependencies]
 grow-core.workspace = true
 grow-git.workspace = true
-grow-runtime.workspace = true
+grow-runtime = { workspace = true, optional = true }
 axum.workspace = true
 tokio.workspace = true
 mime_guess.workspace = true
@@ -23,6 +27,13 @@ tower-http = { version = "0.6", features = ["cors"] }
 tempfile.workspace = true
 wat.workspace = true
 tower = { version = "0.5", features = ["util"] }
+
+# The e2e suite drives a real WASM module through the runtime; it only
+# exists in the default (wasm) build.
+[[test]]
+name = "e2e"
+path = "tests/e2e.rs"
+required-features = ["wasm"]
 
 [[bin]]
 name = "grow-server"

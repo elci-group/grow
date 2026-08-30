@@ -12,6 +12,7 @@ grow-git.workspace = true
 grow-runtime.workspace = true
 grow-server.workspace = true
 clap.workspace = true
+form3.workspace = true
 axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true

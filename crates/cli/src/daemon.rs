@@ -8,9 +8,7 @@
 //! with the same approval/storage policy as `grow serve`, and answers with
 //! the URL the browser should navigate to.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
 use axum::extract::{Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
@@ -21,21 +19,19 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use tokio::net::TcpListener;
 
+use grow_server::resolve::{Resolver, parse_grow_url};
+
 use crate::{InstalledApp, enforce_install_policy, install_into, installed_apps_in, resolve_in};
 
 /// Default localhost port for the control plane.
 pub const DEFAULT_PORT: u16 = 7890;
-
-/// Apps are served on sequential ports starting here, skipping any port
-/// already taken by another process.
-const FIRST_APP_PORT: u16 = 7901;
 
 type BoxError = Box<dyn std::error::Error>;
 
 #[derive(Clone)]
 struct DaemonState {
     root: PathBuf,
-    served: Arc<Mutex<HashMap<String, u16>>>,
+    resolver: Resolver,
 }
 
 /// Run the control plane on `127.0.0.1:port` until interrupted.
@@ -44,7 +40,7 @@ pub fn run(root: &Path, port: u16) -> Result<(), BoxError> {
     runtime.block_on(async move {
         let state = DaemonState {
             root: root.to_path_buf(),
-            served: Arc::new(Mutex::new(HashMap::new())),
+            resolver: Resolver::new(),
         };
         let router = Router::new()
             .route("/", get(index))
@@ -79,10 +75,7 @@ async fn healthz() -> &'static str {
 
 async fn index(State(state): State<DaemonState>) -> Html<String> {
     let mut rows = String::new();
-    let served = state.served.lock().unwrap().clone();
-    let mut apps: Vec<(String, u16)> = served.into_iter().collect();
-    apps.sort();
-    for (app, port) in apps {
+    for (app, port) in state.resolver.apps() {
         rows.push_str(&format!(
             "<li><a href=\"http://127.0.0.1:{port}/\">{app}</a> — port {port}</li>\n"
         ));
@@ -108,8 +101,9 @@ async fn index(State(state): State<DaemonState>) -> Html<String> {
 }
 
 async fn apps(State(state): State<DaemonState>) -> Json<serde_json::Value> {
-    let served = state.served.lock().unwrap().clone();
-    let apps: Vec<serde_json::Value> = served
+    let apps: Vec<serde_json::Value> = state
+        .resolver
+        .apps()
         .iter()
         .map(|(app, port)| {
             serde_json::json!({ "app": app, "port": port, "url": format!("http://127.0.0.1:{port}/") })
@@ -133,70 +127,6 @@ async fn resolve(State(state): State<DaemonState>, Query(query): Query<ResolveQu
         )
             .into_response(),
     }
-}
-
-/// A parsed `grow://host/owner/repo[/path...]` URL.
-#[derive(Debug, PartialEq)]
-struct GrowTarget {
-    host: String,
-    owner: String,
-    repo: String,
-    /// Path within the served site, always rooted (`/` when absent).
-    path: String,
-}
-
-impl GrowTarget {
-    /// The https clone source for this repository.
-    fn clone_source(&self) -> String {
-        format!("https://{}/{}/{}.git", self.host, self.owner, self.repo)
-    }
-}
-
-/// Parse a `grow://` URL. The first two path segments are the owner and
-/// repository (gitlab subgroups are not supported yet); any remaining
-/// segments become the path navigated to within the served site.
-fn parse_grow_url(url: &str) -> Result<GrowTarget, String> {
-    let rest = url
-        .strip_prefix("grow://")
-        .ok_or("URL must start with grow://")?;
-    let rest = rest.trim_matches('/');
-    let mut segments = rest.split('/');
-    let host = segments.next().unwrap_or_default();
-    let host = host.strip_prefix("www.").unwrap_or(host);
-    if !matches!(host, "github.com" | "gitlab.com") {
-        return Err(format!(
-            "host '{host}' is not supported; use grow://github.com/... or grow://gitlab.com/..."
-        ));
-    }
-    let segment = |name: &str, value: Option<&str>| -> Result<String, String> {
-        let value = value.unwrap_or_default();
-        if value.is_empty()
-            || !value
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
-        {
-            return Err(format!("invalid {name} in grow:// URL: '{value}'"));
-        }
-        Ok(value.trim_end_matches(".git").to_string())
-    };
-    let owner = segment("owner", segments.next())?;
-    let repo = segment("repo", segments.next())?;
-    let inner: Vec<&str> = segments.collect();
-    let path = if inner.is_empty() {
-        "/".to_string()
-    } else {
-        let joined = inner.join("/");
-        if !grow_core::is_safe_relative_path(&joined) {
-            return Err(format!("unsafe path in grow:// URL: '{joined}'"));
-        }
-        format!("/{joined}")
-    };
-    Ok(GrowTarget {
-        host: host.to_string(),
-        owner,
-        repo,
-        path,
-    })
 }
 
 /// Resolve a grow:// URL to a running app server, installing and starting
@@ -240,8 +170,8 @@ async fn resolve_grow_url(state: &DaemonState, url: &str) -> Result<serde_json::
 /// use. The approval record and storage grant are enforced exactly as in
 /// `grow serve`.
 async fn ensure_served(state: &DaemonState, app: &InstalledApp) -> Result<u16, String> {
-    if let Some(port) = state.served.lock().unwrap().get(&app.name) {
-        return Ok(*port);
+    if let Some(port) = state.resolver.port_for(&app.name) {
+        return Ok(port);
     }
 
     let resolved = resolve_in(&state.root, &app.name).map_err(|e| e.to_string())?;
@@ -250,88 +180,5 @@ async fn ensure_served(state: &DaemonState, app: &InstalledApp) -> Result<u16, S
         enforce_install_policy(&state.root, &resolved, &repo).map_err(|e| e.to_string())?;
     let app_state =
         grow_server::load_with_storage(&resolved.repo_path, storage).map_err(|e| e.to_string())?;
-    let router = grow_server::app(app_state);
-
-    let mut port = *state
-        .served
-        .lock()
-        .unwrap()
-        .values()
-        .max()
-        .unwrap_or(&(FIRST_APP_PORT - 1))
-        + 1;
-    let listener = loop {
-        match TcpListener::bind(std::net::SocketAddr::from(([127, 0, 0, 1], port))).await {
-            Ok(listener) => break listener,
-            Err(_) if port < FIRST_APP_PORT + 1000 => port += 1,
-            Err(e) => return Err(format!("no free app port: {e}")),
-        }
-    };
-    tokio::spawn(async move {
-        let make_service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
-        if let Err(e) = axum::serve(listener, make_service).await {
-            tracing::warn!("app server stopped: {e}");
-        }
-    });
-    state.served.lock().unwrap().insert(app.name.clone(), port);
-    tracing::info!(app = %app.name, port, "serving app");
-    Ok(port)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_github_repo_root() {
-        let target = parse_grow_url("grow://github.com/owner/repo").unwrap();
-        assert_eq!(
-            target,
-            GrowTarget {
-                host: "github.com".into(),
-                owner: "owner".into(),
-                repo: "repo".into(),
-                path: "/".into(),
-            }
-        );
-        assert_eq!(target.clone_source(), "https://github.com/owner/repo.git");
-    }
-
-    #[test]
-    fn parses_gitlab_repo_with_inner_path() {
-        let target = parse_grow_url("grow://gitlab.com/group/app/docs/guide/").unwrap();
-        assert_eq!(target.host, "gitlab.com");
-        assert_eq!(target.path, "/docs/guide");
-    }
-
-    #[test]
-    fn strips_git_suffix_and_www_prefix() {
-        let target = parse_grow_url("grow://www.github.com/owner/repo.git").unwrap();
-        assert_eq!(target.host, "github.com");
-        assert_eq!(target.repo, "repo");
-    }
-
-    #[test]
-    fn rejects_unknown_host() {
-        let err = parse_grow_url("grow://example.com/owner/repo").unwrap_err();
-        assert!(err.contains("not supported"), "got: {err}");
-    }
-
-    #[test]
-    fn rejects_missing_segments() {
-        assert!(parse_grow_url("grow://github.com/owner").is_err());
-        assert!(parse_grow_url("grow://github.com/").is_err());
-        assert!(parse_grow_url("grow://").is_err());
-    }
-
-    #[test]
-    fn rejects_path_traversal() {
-        let err = parse_grow_url("grow://github.com/owner/repo/../../etc").unwrap_err();
-        assert!(err.contains("unsafe path"), "got: {err}");
-    }
-
-    #[test]
-    fn rejects_non_grow_scheme() {
-        assert!(parse_grow_url("https://github.com/owner/repo").is_err());
-    }
+    state.resolver.serve_app(&app.name, app_state).await
 }

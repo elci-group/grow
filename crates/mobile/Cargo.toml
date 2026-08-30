@@ -1,0 +1,24 @@
+[package]
+name = "grow-mobile"
+description = "Grow Browser engine: on-device grow:// resolution, verification, and serving (JNI)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+grow-core.workspace = true
+grow-git.workspace = true
+grow-server = { path = "../server", default-features = false }
+tokio.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+[dev-dependencies]
+tempfile.workspace = true

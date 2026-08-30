@@ -1,11 +1,13 @@
 //! grow-git: repository loading for GROW.
 //!
-//! Uses `gix` (pure-Rust git) — git is never shelled out to at runtime.
-//! Milestone 1 scope: open a local repository, resolve and expose the HEAD
-//! commit (the "verify commit" lifecycle step), and read files from the
-//! verified commit tree with path-traversal protection. Repositories can
-//! also be cloned, but only from local paths and `file://` URLs — remote
-//! fetch, shallow clones, and object streaming arrive in Milestone 3.
+//! Uses `gix` (pure-Rust git) for every operation — a host `git` binary is
+//! never required, so the same code runs on Android. Opens a local
+//! repository, resolves and exposes the HEAD commit (the "verify commit"
+//! lifecycle step), and reads files from the verified commit tree with
+//! path-traversal protection. Repositories can be cloned from local paths,
+//! `file://` URLs, and allowlisted `https://` remotes (github.com and
+//! gitlab.com); https clones are shallow (`--depth 1` equivalent) since only
+//! the verified HEAD tree is ever read.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -99,9 +101,9 @@ impl Repository {
     /// host is `github.com` or `gitlab.com` (the hosts the `grow://` browser
     /// flow supports); any other scheme or host is rejected, as are URLs
     /// carrying credentials. Local and `file://` sources clone through gix's
-    /// file transport; `https://` remotes clone through the host's `git`
-    /// binary (a shallow `--depth 1` clone, since only the verified HEAD
-    /// tree is served). `dest` must not exist yet or be an empty directory.
+    /// file transport; `https://` remotes clone through gix's https transport
+    /// as a shallow `--depth 1` equivalent, since only the verified HEAD tree
+    /// is served. `dest` must not exist yet or be an empty directory.
     /// The clone is a normal (non-bare) repository with the source `HEAD`
     /// branch checked out into the working tree.
     pub fn clone_from(source: &str, dest: &Path) -> Result<Self, GitError> {
@@ -110,21 +112,29 @@ impl Repository {
             reason: e.to_string(),
         })?;
         match url.scheme {
-            gix::url::Scheme::File => Self::clone_local(source, dest),
+            gix::url::Scheme::File => Self::clone_gix(source, dest, None),
             gix::url::Scheme::Https => {
                 validate_https_remote(&url)?;
-                Self::clone_https(source, dest)
+                Self::clone_gix(source, dest, Some(https_shallow()))
             }
             _ => Err(GitError::UnsupportedScheme(source.to_string())),
         }
     }
 
-    /// Clone a local path or `file://` URL via gix's file transport.
-    fn clone_local(source: &str, dest: &Path) -> Result<Self, GitError> {
+    /// Clone through gix, optionally shallow. Used for local paths, `file://`
+    /// URLs (full clone), and allowlisted `https://` remotes (shallow).
+    fn clone_gix(
+        source: &str,
+        dest: &Path,
+        shallow: Option<gix::remote::fetch::Shallow>,
+    ) -> Result<Self, GitError> {
         let mut fetch = gix::prepare_clone(source, dest).map_err(|e| GitError::Clone {
             url: source.to_string(),
             reason: e.to_string(),
         })?;
+        if let Some(shallow) = shallow {
+            fetch = fetch.with_shallow(shallow);
+        }
         let (mut checkout, _outcome) = fetch
             .fetch_then_checkout(gix::progress::Discard, &AtomicBool::new(false))
             .map_err(|e| GitError::Clone {
@@ -138,33 +148,6 @@ impl Repository {
                 reason: e.to_string(),
             })?;
 
-        Self::open(dest)
-    }
-
-    /// Clone an allowlisted `https://` remote via the host's `git` binary.
-    /// Shallow: the daemon re-clones from scratch on reinstall, and only the
-    /// verified HEAD tree is ever read.
-    fn clone_https(source: &str, dest: &Path) -> Result<Self, GitError> {
-        let output = std::process::Command::new("git")
-            .args(["clone", "--quiet", "--depth", "1", source])
-            .arg(dest)
-            .output()
-            .map_err(|e| GitError::Clone {
-                url: source.to_string(),
-                reason: format!("cannot run git: {e}"),
-            })?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(GitError::Clone {
-                url: source.to_string(),
-                reason: stderr
-                    .trim()
-                    .lines()
-                    .last()
-                    .unwrap_or("git clone failed")
-                    .to_string(),
-            });
-        }
         Self::open(dest)
     }
 
@@ -222,6 +205,13 @@ fn validate_https_remote(url: &gix::Url) -> Result<(), GitError> {
         ));
     }
     Ok(())
+}
+
+/// Shallow-ness for https clones: a `--depth 1` equivalent. The registry
+/// re-clones from scratch on reinstall, and only the verified HEAD tree is
+/// ever read, so history is never needed.
+fn https_shallow() -> gix::remote::fetch::Shallow {
+    gix::remote::fetch::Shallow::DepthAtRemote(std::num::NonZeroU32::MIN)
 }
 
 fn read_tree_file(
@@ -394,6 +384,20 @@ entry = "main.wasm"
         )
         .unwrap_err();
         assert!(matches!(err, GitError::CredentialsInUrl(_)));
+    }
+
+    #[test]
+    #[ignore = "network: clones from github.com"]
+    fn clones_shallow_from_github_https() {
+        let dest = tempfile::tempdir().unwrap();
+        let repo = Repository::clone_from(
+            "https://github.com/elci-group/octo-site",
+            &dest.path().join("clone"),
+        )
+        .expect("https clone succeeds");
+        assert_eq!(repo.manifest().grow.name, "octo-site");
+        assert_eq!(repo.head_commit().len(), 40, "sha1 hex length");
+        assert!(repo.contains_file("index.html"));
     }
 
     #[test]

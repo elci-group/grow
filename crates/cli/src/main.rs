@@ -192,29 +192,42 @@ struct ResolvedApp {
     installed: Option<InstalledApp>,
 }
 
+/// Bold-cyan field label, matching `inspect`'s prior raw-ANSI styling.
+fn label(text: &str) -> String {
+    use form3::compat::Colorize;
+    text.cyan().bold().to_string()
+}
+
 fn inspect(repo_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    use form3::compat::Colorize;
+
     let repo = Repository::open(repo_path)
         .map_err(|e| format!("failed to open repository '{}': {}", repo_path.display(), e))?;
     let manifest = repo.manifest();
-    println!("\x1b[1;36mname\x1b[0m        {}", manifest.grow.name);
-    println!("\x1b[1;36mversion\x1b[0m     {}", manifest.grow.version);
-    println!("\x1b[1;36mcommit\x1b[0m      {}", repo.head_commit());
+    println!("{}        {}", label("name"), manifest.grow.name);
+    println!("{}     {}", label("version"), manifest.grow.version);
+    println!("{}      {}", label("commit"), repo.head_commit());
+    let static_label = "static".yellow().to_string();
     println!(
-        "\x1b[1;36mruntime\x1b[0m     {}",
-        manifest.wasm_entry().unwrap_or("\x1b[33mstatic\x1b[0m")
+        "{}     {}",
+        label("runtime"),
+        manifest.wasm_entry().unwrap_or(static_label.as_str())
     );
     println!(
-        "\x1b[1;36mnetwork\x1b[0m     {}",
+        "{}     {}",
+        label("network"),
         manifest.network.enabled.unwrap_or(false)
     );
     println!(
-        "\x1b[1;36mpermissions\x1b[0m filesystem={:?}, camera={:?}, microphone={:?}",
+        "{} filesystem={:?}, camera={:?}, microphone={:?}",
+        label("permissions"),
         manifest.permissions.filesystem,
         manifest.permissions.camera,
         manifest.permissions.microphone
     );
     println!(
-        "\x1b[1;36mstorage\x1b[0m     {}",
+        "{}     {}",
+        label("storage"),
         manifest.storage.quota.as_deref().unwrap_or("unlimited")
     );
     Ok(())

@@ -11,23 +11,33 @@ instead of being deployed to a server.
 |   grow-cli    |     |  grow-server  |     |  grow-core    |
 |  (commands)   | --> |  (daemon)     | --> | (manifest)    |
 +---------------+     +---------------+     +---------------+
-                             |                       |
-                             v                       v
-                      +---------------+     +---------------+
-                      |  grow-git     |     | grow-runtime  |
-                      | (repo loader) |     | (wasm sandbox)|
-                      +---------------+     +---------------+
+       |                     |                       |
+       |              +------+------+                |
+       |              | grow-mobile  |               |
+       |              | (Android JNI)|               |
+       |              +------+------+                |
+       v                     v                       v
++---------------+     +---------------+     +---------------+
+|  grow-git     |     |  grow-server  |     | grow-runtime  |
+| (pure-gix     |     | resolve/serve |     | (wasm sandbox)|
+|  repo loader) |     |               |     |               |
++---------------+     +---------------+     +---------------+
 ```
+
+`grow-mobile` embeds core/git/server (static-only, no wasmtime) as the
+on-device engine for Grow Browser Mobile in `mobile/`; the Chrome extension
+in `extension/` resolves `grow://` URLs through `grow daemon`.
 
 ## Status: Milestone 2 — Local Registry & Storage (MVP track)
 
 | Crate | Role | Tests |
 |---|---|---|
 | `crates/core` | `.grow/manifest.toml` schema, parsing, validation | 25 |
-| `crates/git` | Repository loading via gix (pure-Rust git), HEAD verification | 15 |
+| `crates/git` | Repository loading via gix (pure-Rust git, incl. shallow https), HEAD verification | 18 + 1 network |
 | `crates/runtime` | wasmtime + WASI preview1, CGI-style invocation, fuel-metered sandbox, storage grants | 10 |
-| `crates/server` | `grow-server` daemon: static assets + WASM request handling + health/metrics | 13 + 1 e2e |
-| `crates/cli` | `grow run` / `grow serve` / `grow inspect` / `grow install` / `grow list` / `grow remove` | 10 |
+| `crates/server` | `grow-server` daemon: static assets + WASM request handling + health/metrics + shared `grow://` resolve core | 22 |
+| `crates/cli` | `grow run` / `grow serve` / `grow inspect` / `grow install` / `grow list` / `grow remove` / `grow daemon` | 10 |
+| `crates/mobile` | Grow Browser engine (JNI): on-device `grow://` resolve, verify, static serve | 2 |
 
 **Security enhancements**: Path traversal protection, restricted WASM features
 (memory64, multi-memory, threads disabled), request body/header limits,
@@ -95,11 +105,13 @@ Execution is bounded by:
 `grow install <repo>` registers an app in the local registry (`$GROW_HOME`,
 else `$XDG_DATA_HOME/grow`, else `~/.local/share/grow`), recording the
 verified commit, manifest identity, requested capabilities, and an approval
-record. The source is a local repository path or a `file://` URL; other URL
-schemes are rejected. Cloned sources are kept at `<registry>/cache/<name>/`
-and deleted by `grow remove <name>` — external source repositories are never
-touched. Cloning uses gix's file transport, which spawns `git-upload-pack`,
-so a `git` binary must be available on the host.
+record. The source is a local repository path, a `file://` URL, or an
+`https://` URL on github.com or gitlab.com; other schemes, other hosts, and
+URLs carrying credentials are rejected. Remote clones are shallow and use
+gix's pure-Rust https transport — no host `git` binary is required, which is
+what lets the same loader run on Android. Cloned sources are kept at
+`<registry>/cache/<name>/` and deleted by `grow remove <name>` — external
+source repositories are never touched.
 
 Apps declaring host capabilities (`network`, `camera`, `microphone`,
 `clipboard`, `notifications`, or `filesystem = "full"`) must be installed
@@ -151,6 +163,27 @@ Resolving never updates an installed app: a moved remote keeps serving the
 installed commit until `grow install <url>` is run again, matching the CLI
 trust model. See `extension/README.md` for browser setup (Load unpacked),
 the omnibox keyword (`grow` + Tab), link interception, and the popup.
+
+## Grow Browser Mobile
+
+`mobile/` is an Android browser where `grow://` is a first-class scheme —
+no extension, no keyword, no desktop daemon. The address bar accepts
+`grow://github.com/<owner>/<repo>` directly; the embedded `grow-mobile`
+engine clones the repo over https (pure-Rust gix), verifies the HEAD commit
+and manifest, and serves the site on a device-local port that the WebView
+renders. Tabs, history, and bookmarks included; repositories are cloned,
+verified, served, and rendered entirely on the end user's device.
+
+```sh
+# native .so for all ABIs, then the APK
+cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 \
+  -o mobile/app/src/main/jniLibs build --release -p grow-mobile
+cd mobile && ./gradlew :app:assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+Milestone 1 serves static sites (all current demos); WASM execution on
+device is the next milestone. See `mobile/README.md` for details.
 
 ## Build and test
 

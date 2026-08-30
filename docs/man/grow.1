@@ -38,13 +38,12 @@ is a local repository path, a
 URL, or an
 .BR https://
 URL on github.com or gitlab.com; other schemes, other hosts, and URLs
-carrying credentials are rejected. Remote clones are shallow and spawn the
-host
-.BR git
-binary, as does gix's file transport, so
+carrying credentials are rejected. Remote clones are shallow and use gix's
+pure-Rust https transport, so no host
 .B git
-must be available on the host. Cloned sources are kept in the registry
-cache until the app is removed. Apps declaring host capabilities
+binary is required — the same loader runs on Android. Cloned sources are
+kept in the registry cache until the app is removed. Apps declaring host
+capabilities
 (network, camera, microphone, clipboard, notifications, or full filesystem)
 require
 .BR --approve-capabilities .

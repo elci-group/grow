@@ -29,6 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     grow_server::serve(grow_server::ServeConfig {
         repo: args.repo,
         port: args.port,
+        #[cfg(feature = "wasm")]
         storage: None,
     })
     .await?;

@@ -24,6 +24,11 @@
 //! WASM invocations run on a blocking thread with a wall-clock timeout on
 //! top of the runtime's fuel metering. Graceful shutdown handles Ctrl+C and
 //! SIGTERM.
+//!
+//! The `wasm` cargo feature (default) gates the WASM runtime. Building with
+//! `--no-default-features` yields a static-assets-only server whose
+//! dependency tree contains no wasmtime — this is how the Android browser
+//! engine embeds grow-server.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -35,14 +40,19 @@ use std::time::{Duration, Instant};
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, DefaultBodyLimit, State};
-use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
+use axum::http::{HeaderMap, Method, StatusCode, Uri, header};
+#[cfg(feature = "wasm")]
+use axum::http::{HeaderName, HeaderValue};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response as HttpResponse};
 use axum::routing::get;
 use grow_git::{GitError, Repository};
+#[cfg(feature = "wasm")]
 use grow_runtime::{Request, Runtime, RuntimeError, StorageGrant};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
+
+pub mod resolve;
 
 pub const DEFAULT_PORT: u16 = 7870;
 /// Wall-clock ceiling per WASM invocation (fuel metering bounds CPU work;
@@ -59,6 +69,7 @@ pub const RATE_LIMIT_PER_MINUTE: u64 = 120;
 pub enum ServerError {
     #[error(transparent)]
     Git(#[from] grow_git::GitError),
+    #[cfg(feature = "wasm")]
     #[error(transparent)]
     Runtime(#[from] grow_runtime::RuntimeError),
     #[error("io error: {0}")]
@@ -68,7 +79,9 @@ pub enum ServerError {
 /// Shared daemon state: the loaded repository and its compiled entry module.
 pub struct AppState {
     repo: Repository,
+    #[cfg(feature = "wasm")]
     runtime: Option<Arc<Runtime>>,
+    #[cfg(feature = "wasm")]
     storage: Option<StorageGrant>,
     metrics: RequestMetrics,
     rate_limiter: RateLimiter,
@@ -135,7 +148,9 @@ impl RateLimiter {
 
 /// Open and verify the repository, compiling the WASM entry if declared.
 ///
-/// Equivalent to [`load_with_storage`] with no storage grant.
+/// Equivalent to [`load_with_storage`] with no storage grant. Without the
+/// `wasm` feature this is the only loader and no module is ever compiled.
+#[cfg(feature = "wasm")]
 pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
     load_with_storage(repo_path, None)
 }
@@ -145,6 +160,7 @@ pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
 /// With `storage`, every WASM invocation preopens the granted directory as
 /// the module's filesystem root and enforces its byte quota; with `None` the
 /// module receives stdio only (see [`grow_runtime::StorageGrant`]).
+#[cfg(feature = "wasm")]
 pub fn load_with_storage(
     repo_path: &Path,
     storage: Option<StorageGrant>,
@@ -161,6 +177,17 @@ pub fn load_with_storage(
         repo,
         runtime,
         storage,
+        metrics: RequestMetrics::new(),
+        rate_limiter: RateLimiter::new(),
+    }))
+}
+
+/// Open and verify the repository (static-assets-only build).
+#[cfg(not(feature = "wasm"))]
+pub fn load(repo_path: &Path) -> Result<Arc<AppState>, ServerError> {
+    let repo = Repository::open(repo_path)?;
+    Ok(Arc::new(AppState {
+        repo,
         metrics: RequestMetrics::new(),
         rate_limiter: RateLimiter::new(),
     }))
@@ -186,12 +213,16 @@ pub struct ServeConfig {
     pub port: u16,
     /// Per-app storage granted to the module's WASI sandbox; `None` for
     /// stdio-only invocations.
+    #[cfg(feature = "wasm")]
     pub storage: Option<StorageGrant>,
 }
 
 /// Serve a repository on `127.0.0.1:port` with graceful shutdown.
 pub async fn serve(config: ServeConfig) -> Result<(), ServerError> {
+    #[cfg(feature = "wasm")]
     let state = load_with_storage(&config.repo, config.storage)?;
+    #[cfg(not(feature = "wasm"))]
+    let state = load(&config.repo)?;
     {
         let manifest = state.repo.manifest();
         tracing::info!(
@@ -342,6 +373,19 @@ async fn handle_request(
         }
     }
 
+    invoke_runtime(state, method, uri, headers, body).await
+}
+
+/// Hand the request to the compiled WASM entry module, or 404 when the
+/// manifest declares no runtime entry.
+#[cfg(feature = "wasm")]
+async fn invoke_runtime(
+    state: Arc<AppState>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> HttpResponse {
     let Some(runtime) = state.runtime.clone() else {
         return status_text(StatusCode::NOT_FOUND, "not found\n");
     };
@@ -381,9 +425,23 @@ async fn handle_request(
     }
 }
 
+/// Static-assets-only build: anything that is not a file in the verified
+/// commit is a 404.
+#[cfg(not(feature = "wasm"))]
+async fn invoke_runtime(
+    _state: Arc<AppState>,
+    _method: Method,
+    _uri: Uri,
+    _headers: HeaderMap,
+    _body: Bytes,
+) -> HttpResponse {
+    status_text(StatusCode::NOT_FOUND, "not found\n")
+}
+
 /// Map a failed WASM invocation to its HTTP response: an over-quota storage
 /// grant means the application exhausted its allowance (507), anything else
 /// is a generic application failure (502).
+#[cfg(feature = "wasm")]
 fn invocation_error_response(err: &RuntimeError) -> HttpResponse {
     match err {
         RuntimeError::StorageQuotaExceeded { .. } => {
@@ -415,6 +473,7 @@ fn md5_hash(data: &[u8]) -> u64 {
     hasher.finish()
 }
 
+#[cfg(feature = "wasm")]
 fn to_http(response: grow_runtime::Response) -> HttpResponse {
     let status = StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let mut builder = HttpResponse::builder().status(status);
@@ -512,6 +571,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
+    #[cfg(feature = "wasm")]
     #[test]
     fn to_http_sets_default_content_type() {
         let resp = grow_runtime::Response {
@@ -526,6 +586,7 @@ mod tests {
         assert_eq!(headers[header::CONTENT_TYPE], "text/plain");
     }
 
+    #[cfg(feature = "wasm")]
     #[test]
     fn to_http_preserves_module_content_type() {
         let resp = grow_runtime::Response {
@@ -539,6 +600,7 @@ mod tests {
         assert_eq!(headers[header::CONTENT_TYPE], "application/json");
     }
 
+    #[cfg(feature = "wasm")]
     #[test]
     fn to_http_drops_invalid_headers() {
         let resp = grow_runtime::Response {
@@ -581,6 +643,7 @@ mod tests {
         assert_eq!(m.total_duration_ms.load(Ordering::Relaxed), 150);
     }
 
+    #[cfg(feature = "wasm")]
     #[test]
     fn invocation_error_maps_quota_exceeded_to_507() {
         let err = RuntimeError::StorageQuotaExceeded { used: 16, quota: 8 };
@@ -588,6 +651,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::INSUFFICIENT_STORAGE);
     }
 
+    #[cfg(feature = "wasm")]
     #[tokio::test]
     async fn invocation_error_quota_body_is_explicit() {
         let err = RuntimeError::StorageQuotaExceeded { used: 16, quota: 8 };
@@ -598,6 +662,7 @@ mod tests {
         assert_eq!(&body[..], b"storage quota exceeded\n");
     }
 
+    #[cfg(feature = "wasm")]
     #[test]
     fn invocation_error_maps_other_errors_to_502() {
         let errors = [

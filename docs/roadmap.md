@@ -74,12 +74,25 @@ by runtime capability, operations, ecosystem, and external validation.
 6. Add a release checklist that verifies version alignment, changelog links,
    artifacts, checksums, SBOM, and security advisory state.
 
+## Mobile Track
+
+Grow Browser Mobile (`mobile/`, Android) makes `grow://` a first-class
+scheme with the full clone → verify → serve → render pipeline on device.
+
+| Milestone | Goal | Exit gate |
+|---|---|---|
+| M1: Grow Browser | Full browser experience driven by grow repos, rendered on device | Address bar takes `grow://` natively; tabs/history/bookmarks; static sites clone+verify+serve on device; debug APK builds |
+| M2: WASM on device | Run grow WASM apps in the browser | wasmtime Android spike resolves; a WASM demo app renders on device |
+| M3: Private repos | Authenticated clone for private repos | Credential store + approval UX; private repo resolves on device |
+| M4: iOS | Same engine, WKWebView shell | grow:// resolves on iOS via WKURLSchemeHandler |
+
 ## Current Non-SOTA Gaps
 
 - Install clones local paths, `file://` URLs, and `https://` remotes on
-  github.com/gitlab.com (shallow, via the host `git` binary); upgrade,
-  rollback, and signing are not implemented, and GitLab subgroups are not
-  parsed by the `grow://` flow.
+  github.com/gitlab.com (shallow, pure-Rust gix transport — no host `git`
+  binary needed, including on Android); upgrade, rollback, and signing are
+  not implemented, and GitLab subgroups are not parsed by the `grow://`
+  flow.
 - Fract and Amber are fail-fast in the local audit script, but advisory in the
   GitHub workflow until their installation story is pinned.
 - There is no published benchmark or comparison matrix yet.

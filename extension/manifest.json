@@ -4,9 +4,21 @@
   "version": "0.2.2",
   "description": "Navigate grow:// URLs — sites hosted on git repositories (GitHub, GitLab), served locally by the grow runtime.",
   "background": { "service_worker": "background.js" },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Open a grow:// URL"
+    "default_title": "Open a grow:// URL",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
   },
   "omnibox": { "keyword": "grow" },
   "host_permissions": ["http://127.0.0.1:7890/*"],

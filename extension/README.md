@@ -37,8 +37,16 @@ trust model as the CLI.
    ./target/release/grow daemon   # listens on 127.0.0.1:7890
    ```
 
-2. Open `chrome://extensions`, enable **Developer mode**, choose
-   **Load unpacked**, and select this `extension/` directory.
+2. Open `chrome://extensions`, enable **Developer mode** (toggle, top
+   right), choose **Load unpacked**, and select this `extension/`
+   directory (`/home/sal/grow/extension`).
+
+3. The extension is hidden by default after loading: click the
+   **puzzle-piece Extensions icon** in the toolbar, find **grow** in the
+   list, and click its **pin** to keep it on the toolbar.
+
+Note: the popup reads "daemon not running" unless `grow daemon` is up —
+the toolbar icon only appears once the extension is loaded and pinned.
 
 ## Usage
 
