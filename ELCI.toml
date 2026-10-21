@@ -1,0 +1,36 @@
+# Staged by portfolio alignment 2026-10-20; NOT yet written to the repository.
+# Requires human review (§38): class, maturity, and relationships are proposals.
+schema = 1
+
+[project]
+name = "grow"
+class = "tool"
+maturity = "M1"
+status = "active"
+description = "Git Repository Oriented Web runtime: apps are published as git repositories and executed locally by a sandboxed Rust/WebAssembly runtime instead of being deployed to servers. Ships a CLI, daemon, gix-based repo loader, fuel-metered wasmtime sandbox, and Android plus browser clients."
+owner = "elci-group"
+criticality = "low"
+
+[interfaces]
+cli = true
+library = true
+http = true
+event_producer = false   # TODO confirm (§10)
+event_consumer = false   # TODO confirm (§10)
+
+[portfolio]
+supersedes = []
+superseded_by = []
+related = []
+depends_on = []          # TODO populate (§23)
+consumed_by = []         # TODO populate (§23)
+
+[maintenance]
+review_interval_days = 60
+last_reviewed = "2026-10-20"
+
+# Central extension (ELCI-PH-001 §5 allows; satisfies §19/§31)
+[language]
+edition = "2024"
+msrv = "1.85"
+version = "0.4.0"
